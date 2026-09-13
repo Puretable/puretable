@@ -36,7 +36,7 @@ export function SuccessPartners() {
             id="success-partners-title"
             className="mt-3 font-display text-2xl font-semibold sm:text-3xl"
           >
-            {lang === "ar" ? "شركاء النجاح" : "Success Partners"}
+            {lang === "ar" ? "شركاء الانطلاق" : "Launch Partners"}
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
             {lang === "ar"

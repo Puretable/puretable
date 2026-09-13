@@ -24,8 +24,10 @@ import { Route as HomeBusinessesRouteImport } from './routes/home-businesses'
 import { Route as GoRouteImport } from './routes/go'
 import { Route as FeaturedRouteImport } from './routes/featured'
 import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DessertsRouteImport } from './routes/desserts'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as ComplaintsRouteImport } from './routes/complaints'
 import { Route as CafesRouteImport } from './routes/cafes'
 import { Route as BakeriesRouteImport } from './routes/bakeries'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -44,9 +46,12 @@ import { Route as ApiPublicCoverRouteImport } from './routes/api/public/cover'
 import { Route as ApiPublicBrandLogoRouteImport } from './routes/api/public/brand-logo'
 import { Route as AuthenticatedAdminSuccessPartnersRouteImport } from './routes/_authenticated/admin.success-partners'
 import { Route as AuthenticatedAdminSubscriptionsRouteImport } from './routes/_authenticated/admin.subscriptions'
+import { Route as AuthenticatedAdminSafetyRouteImport } from './routes/_authenticated/admin.safety'
 import { Route as AuthenticatedAdminMessagesRouteImport } from './routes/_authenticated/admin.messages'
 import { Route as AuthenticatedAdminLeadsRouteImport } from './routes/_authenticated/admin.leads'
 import { Route as AuthenticatedAdminImportRouteImport } from './routes/_authenticated/admin.import'
+import { Route as AuthenticatedAdminFaqsRouteImport } from './routes/_authenticated/admin.faqs'
+import { Route as AuthenticatedAdminComplaintsRouteImport } from './routes/_authenticated/admin.complaints'
 import { Route as AuthenticatedAdminCategoriesRouteImport } from './routes/_authenticated/admin.categories'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedAdminAppearanceRouteImport } from './routes/_authenticated/admin.appearance'
@@ -130,6 +135,11 @@ const FavoritesRoute = FavoritesRouteImport.update({
   path: '/favorites',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DessertsRoute = DessertsRouteImport.update({
   id: '/desserts',
   path: '/desserts',
@@ -138,6 +148,11 @@ const DessertsRoute = DessertsRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplaintsRoute = ComplaintsRouteImport.update({
+  id: '/complaints',
+  path: '/complaints',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CafesRoute = CafesRouteImport.update({
@@ -231,6 +246,12 @@ const AuthenticatedAdminSubscriptionsRoute =
     path: '/subscriptions',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSafetyRoute =
+  AuthenticatedAdminSafetyRouteImport.update({
+    id: '/safety',
+    path: '/safety',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminMessagesRoute =
   AuthenticatedAdminMessagesRouteImport.update({
     id: '/messages',
@@ -246,6 +267,17 @@ const AuthenticatedAdminImportRoute =
   AuthenticatedAdminImportRouteImport.update({
     id: '/import',
     path: '/import',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminFaqsRoute = AuthenticatedAdminFaqsRouteImport.update({
+  id: '/faqs',
+  path: '/faqs',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminComplaintsRoute =
+  AuthenticatedAdminComplaintsRouteImport.update({
+    id: '/complaints',
+    path: '/complaints',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminCategoriesRoute =
@@ -296,8 +328,10 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/bakeries': typeof BakeriesRoute
   '/cafes': typeof CafesRoute
+  '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
   '/go': typeof GoRoute
@@ -321,9 +355,12 @@ export interface FileRoutesByFullPath {
   '/admin/appearance': typeof AuthenticatedAdminAppearanceRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/categories': typeof AuthenticatedAdminCategoriesRoute
+  '/admin/complaints': typeof AuthenticatedAdminComplaintsRoute
+  '/admin/faqs': typeof AuthenticatedAdminFaqsRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/admin/messages': typeof AuthenticatedAdminMessagesRoute
+  '/admin/safety': typeof AuthenticatedAdminSafetyRoute
   '/admin/subscriptions': typeof AuthenticatedAdminSubscriptionsRoute
   '/admin/success-partners': typeof AuthenticatedAdminSuccessPartnersRoute
   '/api/public/brand-logo': typeof ApiPublicBrandLogoRoute
@@ -342,8 +379,10 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/bakeries': typeof BakeriesRoute
   '/cafes': typeof CafesRoute
+  '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
   '/go': typeof GoRoute
@@ -366,9 +405,12 @@ export interface FileRoutesByTo {
   '/admin/appearance': typeof AuthenticatedAdminAppearanceRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/categories': typeof AuthenticatedAdminCategoriesRoute
+  '/admin/complaints': typeof AuthenticatedAdminComplaintsRoute
+  '/admin/faqs': typeof AuthenticatedAdminFaqsRoute
   '/admin/import': typeof AuthenticatedAdminImportRoute
   '/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/admin/messages': typeof AuthenticatedAdminMessagesRoute
+  '/admin/safety': typeof AuthenticatedAdminSafetyRoute
   '/admin/subscriptions': typeof AuthenticatedAdminSubscriptionsRoute
   '/admin/success-partners': typeof AuthenticatedAdminSuccessPartnersRoute
   '/api/public/brand-logo': typeof ApiPublicBrandLogoRoute
@@ -389,8 +431,10 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/bakeries': typeof BakeriesRoute
   '/cafes': typeof CafesRoute
+  '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
   '/go': typeof GoRoute
@@ -414,9 +458,12 @@ export interface FileRoutesById {
   '/_authenticated/admin/appearance': typeof AuthenticatedAdminAppearanceRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/categories': typeof AuthenticatedAdminCategoriesRoute
+  '/_authenticated/admin/complaints': typeof AuthenticatedAdminComplaintsRoute
+  '/_authenticated/admin/faqs': typeof AuthenticatedAdminFaqsRoute
   '/_authenticated/admin/import': typeof AuthenticatedAdminImportRoute
   '/_authenticated/admin/leads': typeof AuthenticatedAdminLeadsRoute
   '/_authenticated/admin/messages': typeof AuthenticatedAdminMessagesRoute
+  '/_authenticated/admin/safety': typeof AuthenticatedAdminSafetyRoute
   '/_authenticated/admin/subscriptions': typeof AuthenticatedAdminSubscriptionsRoute
   '/_authenticated/admin/success-partners': typeof AuthenticatedAdminSuccessPartnersRoute
   '/api/public/brand-logo': typeof ApiPublicBrandLogoRoute
@@ -437,8 +484,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bakeries'
     | '/cafes'
+    | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/faq'
     | '/favorites'
     | '/featured'
     | '/go'
@@ -462,9 +511,12 @@ export interface FileRouteTypes {
     | '/admin/appearance'
     | '/admin/audit'
     | '/admin/categories'
+    | '/admin/complaints'
+    | '/admin/faqs'
     | '/admin/import'
     | '/admin/leads'
     | '/admin/messages'
+    | '/admin/safety'
     | '/admin/subscriptions'
     | '/admin/success-partners'
     | '/api/public/brand-logo'
@@ -483,8 +535,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bakeries'
     | '/cafes'
+    | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/faq'
     | '/favorites'
     | '/featured'
     | '/go'
@@ -507,9 +561,12 @@ export interface FileRouteTypes {
     | '/admin/appearance'
     | '/admin/audit'
     | '/admin/categories'
+    | '/admin/complaints'
+    | '/admin/faqs'
     | '/admin/import'
     | '/admin/leads'
     | '/admin/messages'
+    | '/admin/safety'
     | '/admin/subscriptions'
     | '/admin/success-partners'
     | '/api/public/brand-logo'
@@ -529,8 +586,10 @@ export interface FileRouteTypes {
     | '/auth'
     | '/bakeries'
     | '/cafes'
+    | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/faq'
     | '/favorites'
     | '/featured'
     | '/go'
@@ -554,9 +613,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/appearance'
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/categories'
+    | '/_authenticated/admin/complaints'
+    | '/_authenticated/admin/faqs'
     | '/_authenticated/admin/import'
     | '/_authenticated/admin/leads'
     | '/_authenticated/admin/messages'
+    | '/_authenticated/admin/safety'
     | '/_authenticated/admin/subscriptions'
     | '/_authenticated/admin/success-partners'
     | '/api/public/brand-logo'
@@ -577,8 +639,10 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BakeriesRoute: typeof BakeriesRoute
   CafesRoute: typeof CafesRoute
+  ComplaintsRoute: typeof ComplaintsRoute
   ContactRoute: typeof ContactRoute
   DessertsRoute: typeof DessertsRoute
+  FaqRoute: typeof FaqRoute
   FavoritesRoute: typeof FavoritesRoute
   FeaturedRoute: typeof FeaturedRoute
   GoRoute: typeof GoRoute
@@ -710,6 +774,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FavoritesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/desserts': {
       id: '/desserts'
       path: '/desserts'
@@ -722,6 +793,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/complaints': {
+      id: '/complaints'
+      path: '/complaints'
+      fullPath: '/complaints'
+      preLoaderRoute: typeof ComplaintsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cafes': {
@@ -850,6 +928,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSubscriptionsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/safety': {
+      id: '/_authenticated/admin/safety'
+      path: '/safety'
+      fullPath: '/admin/safety'
+      preLoaderRoute: typeof AuthenticatedAdminSafetyRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/messages': {
       id: '/_authenticated/admin/messages'
       path: '/messages'
@@ -869,6 +954,20 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/admin/import'
       preLoaderRoute: typeof AuthenticatedAdminImportRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/faqs': {
+      id: '/_authenticated/admin/faqs'
+      path: '/faqs'
+      fullPath: '/admin/faqs'
+      preLoaderRoute: typeof AuthenticatedAdminFaqsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/complaints': {
+      id: '/_authenticated/admin/complaints'
+      path: '/complaints'
+      fullPath: '/admin/complaints'
+      preLoaderRoute: typeof AuthenticatedAdminComplaintsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/categories': {
@@ -928,9 +1027,12 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAppearanceRoute: typeof AuthenticatedAdminAppearanceRoute
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminCategoriesRoute: typeof AuthenticatedAdminCategoriesRoute
+  AuthenticatedAdminComplaintsRoute: typeof AuthenticatedAdminComplaintsRoute
+  AuthenticatedAdminFaqsRoute: typeof AuthenticatedAdminFaqsRoute
   AuthenticatedAdminImportRoute: typeof AuthenticatedAdminImportRoute
   AuthenticatedAdminLeadsRoute: typeof AuthenticatedAdminLeadsRoute
   AuthenticatedAdminMessagesRoute: typeof AuthenticatedAdminMessagesRoute
+  AuthenticatedAdminSafetyRoute: typeof AuthenticatedAdminSafetyRoute
   AuthenticatedAdminSubscriptionsRoute: typeof AuthenticatedAdminSubscriptionsRoute
   AuthenticatedAdminSuccessPartnersRoute: typeof AuthenticatedAdminSuccessPartnersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -943,9 +1045,12 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAppearanceRoute: AuthenticatedAdminAppearanceRoute,
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
   AuthenticatedAdminCategoriesRoute: AuthenticatedAdminCategoriesRoute,
+  AuthenticatedAdminComplaintsRoute: AuthenticatedAdminComplaintsRoute,
+  AuthenticatedAdminFaqsRoute: AuthenticatedAdminFaqsRoute,
   AuthenticatedAdminImportRoute: AuthenticatedAdminImportRoute,
   AuthenticatedAdminLeadsRoute: AuthenticatedAdminLeadsRoute,
   AuthenticatedAdminMessagesRoute: AuthenticatedAdminMessagesRoute,
+  AuthenticatedAdminSafetyRoute: AuthenticatedAdminSafetyRoute,
   AuthenticatedAdminSubscriptionsRoute: AuthenticatedAdminSubscriptionsRoute,
   AuthenticatedAdminSuccessPartnersRoute:
     AuthenticatedAdminSuccessPartnersRoute,
@@ -989,8 +1094,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BakeriesRoute: BakeriesRoute,
   CafesRoute: CafesRoute,
+  ComplaintsRoute: ComplaintsRoute,
   ContactRoute: ContactRoute,
   DessertsRoute: DessertsRoute,
+  FaqRoute: FaqRoute,
   FavoritesRoute: FavoritesRoute,
   FeaturedRoute: FeaturedRoute,
   GoRoute: GoRoute,

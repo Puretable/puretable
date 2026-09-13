@@ -25,7 +25,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin/success-partners")({
   head: () => ({
-    meta: [{ title: "شركاء النجاح — Pure Table" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "شركاء الانطلاق — Pure Table" }, { name: "robots", content: "noindex" }],
   }),
   component: SuccessPartnersAdmin,
 });
@@ -99,7 +99,7 @@ function SuccessPartnersAdmin() {
       await run(
         `business-${businessId}`,
         () => removePartner({ data: { id: partner.id } }),
-        "تمت إزالة المحل من شركاء النجاح.",
+        "تمت إزالة المحل من شركاء الانطلاق.",
       );
     } else {
       await run(
@@ -157,7 +157,7 @@ function SuccessPartnersAdmin() {
   return (
     <div className="space-y-10">
       <header>
-        <h1 className="font-display text-2xl font-semibold">شركاء النجاح</h1>
+        <h1 className="font-display text-2xl font-semibold">شركاء الانطلاق</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           اختر محلاً مسجلاً بنقرة واحدة، أو أضف جهة مستقلة. كل شريك مفعّل يظهر تلقائياً قبل تذييل
           الصفحة الرئيسية.

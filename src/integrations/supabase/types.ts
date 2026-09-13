@@ -454,6 +454,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      complaints: {
+        Row: {
+          admin_notes: string | null;
+          complaint_type: string;
+          created_at: string;
+          details: string;
+          email: string | null;
+          full_name: string;
+          id: string;
+          initial_response_at: string | null;
+          order_reference: string | null;
+          phone: string;
+          resolved_at: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          admin_notes?: string | null;
+          complaint_type: string;
+          created_at?: string;
+          details: string;
+          email?: string | null;
+          full_name: string;
+          id?: string;
+          initial_response_at?: string | null;
+          order_reference?: string | null;
+          phone: string;
+          resolved_at?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          admin_notes?: string | null;
+          complaint_type?: string;
+          created_at?: string;
+          details?: string;
+          email?: string | null;
+          full_name?: string;
+          id?: string;
+          initial_response_at?: string | null;
+          order_reference?: string | null;
+          phone?: string;
+          resolved_at?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       contact_messages: {
         Row: {
           created_at: string;
@@ -484,6 +532,42 @@ export type Database = {
           read?: boolean;
           subject?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      faqs: {
+        Row: {
+          answer_ar: string;
+          answer_en: string;
+          created_at: string;
+          id: string;
+          question_ar: string;
+          question_en: string;
+          sort_order: number;
+          updated_at: string;
+          visible: boolean;
+        };
+        Insert: {
+          answer_ar: string;
+          answer_en?: string;
+          created_at?: string;
+          id?: string;
+          question_ar: string;
+          question_en?: string;
+          sort_order?: number;
+          updated_at?: string;
+          visible?: boolean;
+        };
+        Update: {
+          answer_ar?: string;
+          answer_en?: string;
+          created_at?: string;
+          id?: string;
+          question_ar?: string;
+          question_en?: string;
+          sort_order?: number;
+          updated_at?: string;
+          visible?: boolean;
         };
         Relationships: [];
       };

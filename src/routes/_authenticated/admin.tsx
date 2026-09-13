@@ -16,6 +16,9 @@ import {
   KeyRound,
   Award,
   Tags,
+  ShieldCheck,
+  HelpCircle,
+  MessageSquareWarning,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -37,13 +40,14 @@ const groups = [
       { to: "/admin/businesses", label: "الأعمال والفروع", icon: Store, exact: false },
       { to: "/admin/categories", label: "التصنيفات", icon: Tags, exact: false },
       { to: "/admin/subscriptions", label: "الاشتراكات والباقات", icon: Layers, exact: false },
-      { to: "/admin/success-partners", label: "شركاء النجاح", icon: Award, exact: false },
+      { to: "/admin/success-partners", label: "شركاء الانطلاق", icon: Award, exact: false },
     ],
   },
   {
     title: "التواصل",
     links: [
       { to: "/admin/messages", label: "الرسائل", icon: Inbox, exact: false },
+      { to: "/admin/complaints", label: "الشكاوى", icon: MessageSquareWarning, exact: false },
       { to: "/admin/leads", label: "طلبات الشراكة", icon: Handshake, exact: false },
     ],
   },
@@ -52,6 +56,8 @@ const groups = [
     links: [
       { to: "/admin/account", label: "تغيير كلمة المرور", icon: KeyRound, exact: false },
       { to: "/admin/appearance", label: "مظهر الموقع", icon: Palette, exact: false },
+      { to: "/admin/safety", label: "نظام نقاط الأمان", icon: ShieldCheck, exact: false },
+      { to: "/admin/faqs", label: "الأسئلة الشائعة", icon: HelpCircle, exact: false },
       { to: "/admin/import", label: "استيراد البيانات", icon: UploadCloud, exact: false },
       { to: "/admin/audit", label: "سجل التغييرات", icon: ScrollText, exact: false },
     ],

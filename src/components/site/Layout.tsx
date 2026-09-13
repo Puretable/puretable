@@ -194,6 +194,16 @@ export function SiteFooter() {
                 {t("footer.terms")}
               </Link>
             </li>
+            <li>
+              <Link to="/complaints" className="hover:text-foreground">
+                {t("footer.complaints")}
+              </Link>
+            </li>
+            <li>
+              <Link to="/faq" className="hover:text-foreground">
+                {t("footer.faq")}
+              </Link>
+            </li>
           </ul>
         </div>
       </div>
@@ -220,6 +230,8 @@ const PRELAUNCH_OPEN = [
   "/reset-password",
   "/privacy",
   "/terms",
+  "/complaints",
+  "/faq",
   "/admin",
 ];
 

@@ -21,6 +21,7 @@ import { applyTheme, DEFAULT_SETTINGS, DEFAULT_TEXT, type SiteSettings } from "@
 import { DEFAULT_LOGO_URL } from "@/lib/brand";
 import heroImageFallback from "@/assets/hero.jpg";
 import { logAudit } from "@/lib/audit";
+import { saveSiteSettings, setSiteLive } from "@/lib/site-settings.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/appearance")({
   component: AppearancePage,
@@ -90,6 +91,8 @@ function AppearancePage() {
   const queryClient = useQueryClient();
   const saved = useSiteSettings();
   const signUpload = useServerFn(signCoverUploadUrl);
+  const saveSettings = useServerFn(saveSiteSettings);
+  const updateSiteLive = useServerFn(setSiteLive);
   const [draft, setDraft] = useState<SiteSettings>(saved);
   const [busy, setBusy] = useState(false);
   const [launchReady, setLaunchReady] = useState(false);
@@ -168,18 +171,14 @@ function AppearancePage() {
       ...draft,
       theme: { ...draft.theme, primaryForeground: readableText(draft.theme.primary) },
     };
-    const { error: saveError } = await supabase.from("site_settings").upsert({
-      id: "default",
-      theme: next.theme,
-      content: next.content,
-      layout: next.layout,
-      draft: null,
-    } as never);
-    setBusy(false);
-    if (saveError) {
-      setError(saveError.message);
+    try {
+      await saveSettings({ data: { settings: next } });
+    } catch (caught) {
+      setBusy(false);
+      setError(caught instanceof Error ? caught.message : "تعذر حفظ إعدادات الموقع.");
       return;
     }
+    setBusy(false);
     setDraft(next);
     logAudit("publish_settings", "site_settings", "default");
     await queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
@@ -212,7 +211,7 @@ function AppearancePage() {
   }
 
   async function toggleLaunch() {
-    const live = saved.sections.site_live === false;
+    const live = draft.sections.site_live === false;
     if (
       !window.confirm(
         live
@@ -225,22 +224,7 @@ function AppearancePage() {
     setError(null);
     setMessage(null);
     try {
-      const { data: current, error: readError } = await supabase
-        .from("site_settings")
-        .select("sections")
-        .eq("id", "default")
-        .single();
-      if (readError) throw readError;
-      const sections = { ...(current.sections as Record<string, boolean>), site_live: live };
-      const { data: changed, error: updateError } = await supabase
-        .from("site_settings")
-        .update({ sections })
-        .eq("id", "default")
-        .eq("sections", JSON.stringify(current.sections))
-        .select("id")
-        .maybeSingle();
-      if (updateError) throw updateError;
-      if (!changed) throw new Error("تغيرت الإعدادات أثناء الحفظ. أعد المحاولة.");
+      const { sections } = await updateSiteLive({ data: { live } });
       setDraft((previous) => ({ ...previous, sections }));
       await queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
       logAudit(live ? "launch_site" : "enable_coming_soon", "site_settings", "default");
@@ -258,7 +242,8 @@ function AppearancePage() {
         <div>
           <h1 className="font-display text-2xl font-semibold">المظهر والهوية</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            التحكم بإطلاق الموقع والشعار والألوان وصورة الواجهة والنصوص الترحيبية والنصوص القانونية وحسابات التواصل.
+            التحكم بإطلاق الموقع والشعار والألوان وصورة الواجهة والنصوص الترحيبية والنصوص القانونية
+            وحسابات التواصل.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -272,7 +257,7 @@ function AppearancePage() {
           <button
             type="button"
             onClick={save}
-            disabled={busy}
+            disabled={busy || !launchReady}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -296,7 +281,7 @@ function AppearancePage() {
         <p className="text-sm font-medium">
           {!launchReady
             ? "جارٍ تحميل حالة الموقع…"
-            : saved.sections.site_live === false
+            : draft.sections.site_live === false
               ? "صفحة قريباً مفعّلة للزوار"
               : "الموقع مفتوح للزوار"}
         </p>
@@ -312,7 +297,7 @@ function AppearancePage() {
         >
           {busy
             ? "جارٍ الحفظ…"
-            : saved.sections.site_live === false
+            : draft.sections.site_live === false
               ? "إطلاق الموقع وإخفاء صفحة قريباً"
               : "إعادة تفعيل صفحة قريباً"}
         </button>
@@ -409,9 +394,9 @@ function AppearancePage() {
 
       <Panel title="النصوص القانونية" icon={ScrollText}>
         <p className="text-sm text-muted-foreground">
-          محتوى صفحتي «سياسة الخصوصية» و«الشروط والأحكام». النص الافتراضي موجود في
-          ملفات الترجمة — اكتب فوقه ثم اضغط «حفظ ونشر» ليتحدّث ما يراه الزائر فوراً.
-          الفراغات بين الفقرات والسطور تُحفظ كما هي.
+          محتوى صفحتي «سياسة الخصوصية» و«الشروط والأحكام». النص الافتراضي موجود في ملفات الترجمة —
+          اكتب فوقه ثم اضغط «حفظ ونشر» ليتحدّث ما يراه الزائر فوراً. الفراغات بين الفقرات والسطور
+          تُحفظ كما هي.
         </p>
         <div className="space-y-5">
           {LEGAL_FIELDS.map((field) => (
@@ -451,8 +436,8 @@ function AppearancePage() {
       <Panel title="التواصل والحسابات" icon={AtSign}>
         <p className="text-sm text-muted-foreground">
           الحسابات الرسمية وأرقام التواصل. أيقونات الفوتر (Instagram و TikTok و WhatsApp و Mail)
-          ورابط الهاتف تظهر فقط حين تكون القيمة مدخلة هنا. القيم الافتراضية فارغة — ما تكتب
-          شيء، ما يطلع شيء.
+          ورابط الهاتف تظهر فقط حين تكون القيمة مدخلة هنا. القيم الافتراضية فارغة — ما تكتب شيء، ما
+          يطلع شيء.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {CONTACT_FIELDS.map((field) => (

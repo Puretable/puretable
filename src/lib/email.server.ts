@@ -12,7 +12,9 @@ export type NotificationType =
   | "partner_admin"
   | "partner_receipt"
   | "waitlist_admin"
-  | "waitlist_receipt";
+  | "waitlist_receipt"
+  | "complaint_admin"
+  | "complaint_receipt";
 
 type SendNotificationInput = {
   eventKey: string;
@@ -113,6 +115,60 @@ export async function notifyContactSubmission(input: {
           intro: "استلمنا رسالتك بنجاح، وسيطّلع عليها فريق Pure Table ويتواصل معك عند الحاجة.",
         },
         metadata: { submission_id: input.id },
+      }),
+    );
+  }
+  await Promise.allSettled(jobs);
+}
+
+export async function notifyComplaintSubmission(input: {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone: string;
+  complaintType: string;
+  orderReference?: string | null;
+  details: string;
+}) {
+  const jobs = [
+    sendNotification({
+      eventKey: `complaint/${input.id}/admin`,
+      type: "complaint_admin",
+      to: adminRecipient(),
+      subject: `شكوى جديدة من ${input.name}`,
+      content: {
+        preheader: "وصلت شكوى جديدة عبر موقع Pure Table.",
+        title: "شكوى جديدة",
+        intro: "تحتاج الشكوى إلى رد أولي خلال 24 ساعة، ومعالجة خلال 3–5 أيام عمل.",
+        details: [
+          { label: "الاسم", value: input.name },
+          { label: "الجوال", value: input.phone },
+          { label: "البريد", value: input.email },
+          { label: "نوع الشكوى", value: input.complaintType },
+          { label: "رقم الطلب أو المرجع", value: input.orderReference },
+          { label: "التفاصيل", value: input.details },
+          { label: "الرقم المرجعي", value: input.id },
+        ],
+        action: { label: "فتح لوحة الشكاوى", url: `${siteOrigin()}/admin/complaints` },
+      },
+      metadata: { complaint_id: input.id },
+    }),
+  ];
+  if (input.email) {
+    jobs.push(
+      sendNotification({
+        eventKey: `complaint/${input.id}/receipt`,
+        type: "complaint_receipt",
+        to: input.email,
+        subject: "استلمنا شكواك — Pure Table",
+        content: {
+          preheader: "تم استلام شكواك بنجاح.",
+          title: `شكراً لك ${input.name}`,
+          intro:
+            "استلمنا شكواك بنجاح. سيكون الرد الأولي خلال 24 ساعة، ومدة المعالجة من 3 إلى 5 أيام عمل.",
+          details: [{ label: "الرقم المرجعي", value: input.id }],
+        },
+        metadata: { complaint_id: input.id },
       }),
     );
   }

@@ -19,6 +19,7 @@ import { LocationPicker } from "@/components/admin/LocationPicker";
 import { BranchEditor } from "@/components/admin/BranchEditor";
 import { MAIN_CITIES, findCity, regionForCity } from "@/lib/saudi";
 import { adminListPlaceCategories } from "@/lib/category.functions";
+import { useSiteText } from "@/hooks/use-site-settings";
 
 import { logAudit } from "@/lib/audit";
 import { getBusinessReport } from "@/lib/analytics.dashboard.functions";
@@ -117,6 +118,7 @@ const DAYS = [
 ] as const;
 
 function EditBusiness() {
+  const { text } = useSiteText();
   const { data: planCatalog } = usePlanDefinitions();
   const planFeatures = (tier: PlanTier) =>
     planCatalog ? toFeatures(planCatalog[tier]) : PLAN_FEATURES[tier];
@@ -611,9 +613,9 @@ function EditBusiness() {
                 >
                   <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-safe" />
                   <span>
-                    <span className="block font-medium">نقطة خضراء — آمن 100%</span>
+                    <span className="block font-medium">{text("safety.safe_label")}</span>
                     <span className="block text-xs text-muted-foreground">
-                      مطبخ مخصص بالكامل وخالٍ من الجلوتين، مناسب لمرضى السيلياك.
+                      {text("safety.safe_desc")}
                     </span>
                   </span>
                 </button>
@@ -624,9 +626,9 @@ function EditBusiness() {
                 >
                   <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-caution" />
                   <span>
-                    <span className="block font-medium">نقطة حمراء — يحتاج تأكيد</span>
+                    <span className="block font-medium">{text("safety.caution_label")}</span>
                     <span className="block text-xs text-muted-foreground">
-                      يوجد خيارات خالية من الجلوتين، لكن على العميل التأكد من الطاقم والفرع.
+                      {text("safety.caution_desc")}
                     </span>
                   </span>
                 </button>
@@ -645,9 +647,9 @@ function EditBusiness() {
                 >
                   <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-shared" />
                   <span>
-                    <span className="block font-medium">نقطة برتقالية — مطبخ مشترك</span>
+                    <span className="block font-medium">{text("safety.shared_label")}</span>
                     <span className="block text-xs text-muted-foreground">
-                      تظهر مع أي تقييم آخر، مع نص قابل للتعديل بالأسفل.
+                      {text("safety.shared_desc")}
                     </span>
                   </span>
                 </button>
