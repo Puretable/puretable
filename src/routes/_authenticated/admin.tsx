@@ -10,7 +10,6 @@ import {
   Moon,
   Sun,
   ScrollText,
-  Handshake,
   Layers,
   ExternalLink,
   KeyRound,
@@ -48,7 +47,6 @@ const groups = [
     links: [
       { to: "/admin/messages", label: "الرسائل", icon: Inbox, exact: false },
       { to: "/admin/complaints", label: "الشكاوى", icon: MessageSquareWarning, exact: false },
-      { to: "/admin/leads", label: "طلبات الشراكة", icon: Handshake, exact: false },
     ],
   },
   {
