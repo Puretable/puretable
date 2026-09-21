@@ -4,6 +4,27 @@
  * skip rendering the button entirely (no empty icons or broken links).
  */
 
+/**
+ * The message every business WhatsApp button opens the chat with. One wording for all visitors and
+ * both site languages, so it is easy to recognise and count on the business side.
+ */
+export const WHATSAPP_INQUIRY_MESSAGE =
+  "أهلًا، وصلت لكم عن طريق Pure Table وأرغب بالاستفسار عن الخيارات الخالية من الجلوتين.";
+
+/**
+ * Percent-encode a chat message for a WhatsApp link.
+ *
+ * `encodeURIComponent` (and URLSearchParams) leave . ! ' ( ) * as they are, but the tracked
+ * redirect (/go) trims trailing punctuation from pasted links, which would silently drop the final
+ * full stop of a message. Encoding those characters too keeps the text exactly as written.
+ */
+export function encodeWhatsappText(message: string): string {
+  return encodeURIComponent(message).replace(
+    /[.!'()*]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase(),
+  );
+}
+
 /** Turn a WhatsApp number or pasted link into a chat URL, optionally with a ready message. */
 export function whatsappHref(
   value: string | null | undefined,
@@ -14,8 +35,11 @@ export function whatsappHref(
   if (/^https?:\/\//i.test(raw)) {
     try {
       const url = new URL(raw);
-      if (message) url.searchParams.set("text", message);
-      return url.toString();
+      if (!message) return url.toString();
+      // A message we supply replaces any text the saved link already carried.
+      url.searchParams.delete("text");
+      const base = url.toString();
+      return `${base}${base.includes("?") ? "&" : "?"}text=${encodeWhatsappText(message)}`;
     } catch {
       return null;
     }
@@ -28,15 +52,13 @@ export function whatsappHref(
     : digits.startsWith("0")
       ? `966${digits.slice(1)}`
       : digits;
-  const url = new URL(`https://wa.me/${intl}`);
-  if (message) url.searchParams.set("text", message);
-  return url.toString();
+  const base = `https://wa.me/${intl}`;
+  return message ? `${base}?text=${encodeWhatsappText(message)}` : base;
 }
 
-export function pureTableWhatsAppMessage(lang: "ar" | "en") {
-  return lang === "ar"
-    ? "مرحباً، وصلتكم عن طريق منصة بيور تيبل وأرغب بـ..."
-    : "Hello, I found you through Pure Table and I would like to...";
+/** The pre-filled message for business WhatsApp buttons (same in Arabic and English). */
+export function pureTableWhatsAppMessage() {
+  return WHATSAPP_INQUIRY_MESSAGE;
 }
 
 /** Add first-party referral attribution without replacing existing query parameters. */

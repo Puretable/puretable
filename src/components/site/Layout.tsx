@@ -46,7 +46,7 @@ export function SiteHeader() {
         </Link>
         <div className="hidden lg:block" />
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
           {shows("header_language") && <LanguageSwitcher />}
           <Link
             to="/favorites"
@@ -73,10 +73,10 @@ export function SiteHeader() {
           )}
           {shows("header_cta") && (
             <Link
-              to="/partners"
-              className="inline-flex rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90"
+              to="/portal"
+              className="inline-flex rounded-full bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90 sm:px-4 sm:text-sm"
             >
-              {t("nav.list_business")}
+              {t("nav.owner_portal")}
             </Link>
           )}
         </div>
@@ -226,6 +226,7 @@ const PRELAUNCH_OPEN = [
   "/auth",
   "/admin-login",
   "/profile",
+  "/portal",
   "/favorites",
   "/reset-password",
   "/privacy",

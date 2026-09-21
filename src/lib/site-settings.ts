@@ -220,7 +220,7 @@ export const EDITABLE_SECTIONS: { key: string; label: string }[] = [
   { key: "categories", label: "قسم الأقسام / Categories" },
   { key: "featured", label: "الأماكن المميزة / Featured places" },
   { key: "why", label: "لماذا بيور تيبل / Why Pure Table" },
-  { key: "header_cta", label: "زر انضم إلينا / Join Us button" },
+  { key: "header_cta", label: "زر بوابة أصحاب الأعمال / Business Owner Portal button" },
   { key: "header_sign_in", label: "زر تسجيل الدخول / Sign in button" },
   { key: "header_language", label: "زر تغيير اللغة / Language switch" },
 ];

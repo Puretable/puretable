@@ -1,6 +1,7 @@
 import { readPlanCatalog } from "./subscriptions.server";
 import { toFeatures } from "./subscriptions";
 import { planOf } from "./plans";
+import type { MenuItem } from "./owner-manage.schemas";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   mapDbBusiness,
@@ -141,6 +142,7 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
     ]);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
+  const menu = await fetchPublicMenu(client, row.id);
   const mappedLinks = (links ?? []).map(mapLink);
   const business = mapDbBusiness(
     row as never,
@@ -152,7 +154,26 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
       ),
     ),
   );
-  return { ...business, entitlements: toFeatures(catalog[planOf(row)]) };
+  return { ...business, menu, entitlements: toFeatures(catalog[planOf(row)]) };
+}
+
+/**
+ * Gluten-free menu items, shown on every plan. A failure here must never take the business page
+ * down (for example while a deployment is ahead of its database migration), so it degrades to an
+ * empty menu.
+ */
+async function fetchPublicMenu(client: SupabaseClient, businessId: string): Promise<MenuItem[]> {
+  const { data, error } = await client
+    .from("business_menu_items")
+    .select("id, business_id, name, name_ar, price, currency, photo_url, safety, sort_order")
+    .eq("business_id", businessId)
+    .order("sort_order")
+    .order("created_at");
+  if (error) {
+    console.error("[menu] unavailable", error.message);
+    return [];
+  }
+  return (data ?? []) as MenuItem[];
 }
 
 export async function assertAdmin(client: SupabaseClient, userId: string) {

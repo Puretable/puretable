@@ -1,6 +1,8 @@
 import { usePlanDefinitions } from "@/hooks/use-plan-definitions";
 import { toFeatures, planSummary } from "@/lib/subscriptions";
 import { BusinessPlanControl } from "@/components/admin/BusinessPlanControl";
+import { BusinessOwnersPanel } from "@/components/admin/BusinessOwnersPanel";
+import { AdminMenuPanel } from "@/components/admin/AdminMenuPanel";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,6 +19,7 @@ import { signCoverUploadUrl } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { LocationPicker } from "@/components/admin/LocationPicker";
 import { BranchEditor } from "@/components/admin/BranchEditor";
+import { LinksEditor } from "@/components/admin/LinksEditor";
 import { MAIN_CITIES, findCity, regionForCity } from "@/lib/saudi";
 import { adminListPlaceCategories } from "@/lib/category.functions";
 import { useSiteText } from "@/hooks/use-site-settings";
@@ -28,8 +31,6 @@ import { downloadBusinessReportPdf } from "@/lib/export-pdf";
 
 import {
   ArrowLeft,
-  Plus,
-  Trash2,
   Upload,
   Loader2,
   Save,
@@ -88,25 +89,6 @@ const DEFAULT_FORM = {
 /** Default visitor-facing text for the orange (shared kitchen) dot — editable per business. */
 const DEFAULT_SHARED_NOTE = "مطبخ مشترك لكن المطبخ والأدوات مفصولة";
 
-const PLATFORMS = [
-  "hungerstation",
-  "jahez",
-  "thechefz",
-  "toyou",
-  "keeta",
-  "requeue",
-  "mytable",
-  "website",
-  "instagram",
-  "x",
-  "tiktok",
-  "snapchat",
-  "facebook",
-  "whatsapp",
-  "email",
-  "maps",
-  "phone",
-] as const;
 const DAYS = [
   ["sun", "Sunday"],
   ["mon", "Monday"],
@@ -725,6 +707,9 @@ function EditBusiness() {
         {!isNew && <BusinessPerformance businessId={id} name={form.name} plan={selectedPlan} />}
       </form>
 
+      {!isNew && <BusinessOwnersPanel businessId={id} />}
+      {!isNew && <AdminMenuPanel businessId={id} />}
+
       {!isNew && (
         <Section title="Action buttons (order & contact links)">
           <p className="text-xs text-muted-foreground">
@@ -892,116 +877,6 @@ function EditBusiness() {
  * The admin previews every location found, removes the wrong ones with ✕,
  * and only then imports the rest (opening hours included).
  */
-function LinksEditor({
-  businessId,
-  links,
-  branches = [],
-  onSave,
-  onDelete,
-}: {
-  businessId: string;
-  links: any[];
-  branches?: any[];
-  onSave: (row: any) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-}) {
-  const EMPTY = { platform: "hungerstation", url: "", label: "", product_name: "", branch_id: "" };
-  const [draft, setDraft] = useState(EMPTY);
-  async function add() {
-    if (!draft.url) return;
-    await onSave({
-      business_id: businessId,
-      ...draft,
-      branch_id: draft.branch_id || null,
-      sort_order: links.length,
-    });
-    setDraft(EMPTY);
-  }
-  const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? null;
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        {links.map((l) => (
-          <div
-            key={l.id}
-            className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[120px_1fr_1fr_auto]"
-          >
-            <span className="text-xs font-semibold capitalize text-primary">{l.platform}</span>
-            <span className="truncate text-xs">
-              {l.product_name || <span className="text-muted-foreground">(no product name)</span>}
-              {l.branch_id && (
-                <span className="ms-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {branchName(l.branch_id) ?? "فرع"}
-                </span>
-              )}
-            </span>
-            <a
-              href={l.url}
-              target="_blank"
-              rel="noreferrer"
-              className="truncate text-xs text-muted-foreground hover:text-primary"
-            >
-              {l.url}
-            </a>
-            <button
-              onClick={() => onDelete(l.id)}
-              className="justify-self-end text-xs text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
-      <div className="grid gap-2 rounded-xl border border-dashed border-border p-3 sm:grid-cols-[140px_1fr_1fr_auto]">
-        <select
-          value={draft.platform}
-          onChange={(e) => setDraft({ ...draft, platform: e.target.value })}
-          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
-        >
-          {PLATFORMS.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <input
-          placeholder="Product name (optional)"
-          value={draft.product_name}
-          onChange={(e) => setDraft({ ...draft, product_name: e.target.value })}
-          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
-        />
-        <input
-          placeholder="https://…"
-          value={draft.url}
-          onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
-        />
-        <button
-          type="button"
-          onClick={add}
-          className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-        >
-          <Plus className="h-3 w-3" /> Add
-        </button>
-        {branches.length > 0 && (
-          <select
-            value={draft.branch_id}
-            onChange={(e) => setDraft({ ...draft, branch_id: e.target.value })}
-            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs sm:col-span-2"
-          >
-            <option value="">كل الفروع / whole business</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-soft)]">

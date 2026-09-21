@@ -8,6 +8,7 @@ import { updatePlanDefinition } from "@/lib/subscriptions.functions";
 import { PlanDefinition, toFeatures, planSummary } from "@/lib/subscriptions";
 import { PLAN_LABELS, PLAN_TIERS, type PlanTier } from "@/lib/plans";
 import { BusinessPlanControl } from "@/components/admin/BusinessPlanControl";
+import { PendingPlanRequests } from "@/components/admin/PendingPlanRequests";
 
 export const Route = createFileRoute("/_authenticated/admin/subscriptions")({
   component: SubscriptionsPage,
@@ -49,6 +50,7 @@ function SubscriptionsPage() {
           </div>
         ))}
       </div>
+      <PendingPlanRequests />
       <div role="tablist" aria-label="إدارة الاشتراكات" className="flex gap-2">
         {(
           [

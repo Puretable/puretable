@@ -175,64 +175,6 @@ export async function notifyComplaintSubmission(input: {
   await Promise.allSettled(jobs);
 }
 
-export async function notifyPartnerSubmission(input: {
-  id: string;
-  businessName: string;
-  businessType?: string | null;
-  city?: string | null;
-  contactName?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  website?: string | null;
-  instagram?: string | null;
-  notes?: string | null;
-}) {
-  const jobs = [
-    sendNotification({
-      eventKey: `partner/${input.id}/admin`,
-      type: "partner_admin",
-      to: adminRecipient(),
-      subject: `طلب انضمام جديد: ${input.businessName}`,
-      content: {
-        preheader: "وصل طلب انضمام منشأة جديد إلى Pure Table.",
-        title: "طلب انضمام منشأة جديد",
-        intro:
-          "سجّلت منشأة اهتمامها بالانضمام إلى الدليل. راجع البيانات وتابع الطلب من لوحة الإدارة.",
-        details: [
-          { label: "المنشأة", value: input.businessName },
-          { label: "النوع", value: input.businessType },
-          { label: "المدينة", value: input.city },
-          { label: "المسؤول", value: input.contactName },
-          { label: "الهاتف", value: input.phone },
-          { label: "البريد", value: input.email },
-          { label: "الموقع", value: input.website },
-          { label: "إنستغرام", value: input.instagram },
-          { label: "ملاحظات", value: input.notes },
-        ],
-        action: { label: "فتح طلبات المنشآت", url: `${siteOrigin()}/admin/leads` },
-      },
-      metadata: { submission_id: input.id },
-    }),
-  ];
-  if (input.email) {
-    jobs.push(
-      sendNotification({
-        eventKey: `partner/${input.id}/receipt`,
-        type: "partner_receipt",
-        to: input.email,
-        subject: "استلمنا طلب انضمام منشأتك — Pure Table",
-        content: {
-          preheader: "تم استلام طلب انضمام منشأتك.",
-          title: "شكراً لاهتمامك بالانضمام",
-          intro: `استلمنا طلب انضمام ${input.businessName} إلى Pure Table، وسيراجع فريقنا البيانات ويتواصل معك قريباً.`,
-        },
-        metadata: { submission_id: input.id },
-      }),
-    );
-  }
-  await Promise.allSettled(jobs);
-}
-
 export async function notifyWaitlistSignup(input: {
   id: string;
   email: string;

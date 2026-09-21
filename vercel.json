@@ -18,6 +18,10 @@
     {
       "path": "/api/public/sheet-sync",
       "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/public/subscription-expiry",
+      "schedule": "37 3 * * *"
     }
   ]
 }

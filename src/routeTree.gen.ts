@@ -18,6 +18,7 @@ import { Route as RestaurantsRouteImport } from './routes/restaurants'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as PartnersRouteImport } from './routes/partners'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as HomeBusinessesRouteImport } from './routes/home-businesses'
@@ -40,6 +41,7 @@ import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as BusinessIdRouteImport } from './routes/business.$id'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicSubscriptionExpiryRouteImport } from './routes/api/public/subscription-expiry'
 import { Route as ApiPublicSheetSyncRouteImport } from './routes/api/public/sheet-sync'
 import { Route as ApiPublicEventRouteImport } from './routes/api/public/event'
 import { Route as ApiPublicCoverRouteImport } from './routes/api/public/cover'
@@ -103,6 +105,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PartnersRoute = PartnersRouteImport.update({
@@ -214,6 +221,12 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const ApiPublicSubscriptionExpiryRoute =
+  ApiPublicSubscriptionExpiryRouteImport.update({
+    id: '/api/public/subscription-expiry',
+    path: '/api/public/subscription-expiry',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSheetSyncRoute = ApiPublicSheetSyncRouteImport.update({
   id: '/api/public/sheet-sync',
   path: '/api/public/sheet-sync',
@@ -338,6 +351,7 @@ export interface FileRoutesByFullPath {
   '/home-businesses': typeof HomeBusinessesRoute
   '/mcp': typeof McpRoute
   '/partners': typeof PartnersRoute
+  '/portal': typeof PortalRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -367,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cover': typeof ApiPublicCoverRouteWithChildren
   '/api/public/event': typeof ApiPublicEventRoute
   '/api/public/sheet-sync': typeof ApiPublicSheetSyncRoute
+  '/api/public/subscription-expiry': typeof ApiPublicSubscriptionExpiryRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/businesses/$id': typeof AuthenticatedAdminBusinessesIdRoute
   '/api/public/cover/$path': typeof ApiPublicCoverPathRoute
@@ -389,6 +404,7 @@ export interface FileRoutesByTo {
   '/home-businesses': typeof HomeBusinessesRoute
   '/mcp': typeof McpRoute
   '/partners': typeof PartnersRoute
+  '/portal': typeof PortalRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -417,6 +433,7 @@ export interface FileRoutesByTo {
   '/api/public/cover': typeof ApiPublicCoverRouteWithChildren
   '/api/public/event': typeof ApiPublicEventRoute
   '/api/public/sheet-sync': typeof ApiPublicSheetSyncRoute
+  '/api/public/subscription-expiry': typeof ApiPublicSubscriptionExpiryRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/businesses/$id': typeof AuthenticatedAdminBusinessesIdRoute
   '/api/public/cover/$path': typeof ApiPublicCoverPathRoute
@@ -441,6 +458,7 @@ export interface FileRoutesById {
   '/home-businesses': typeof HomeBusinessesRoute
   '/mcp': typeof McpRoute
   '/partners': typeof PartnersRoute
+  '/portal': typeof PortalRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -470,6 +488,7 @@ export interface FileRoutesById {
   '/api/public/cover': typeof ApiPublicCoverRouteWithChildren
   '/api/public/event': typeof ApiPublicEventRoute
   '/api/public/sheet-sync': typeof ApiPublicSheetSyncRoute
+  '/api/public/subscription-expiry': typeof ApiPublicSubscriptionExpiryRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/businesses/$id': typeof AuthenticatedAdminBusinessesIdRoute
   '/api/public/cover/$path': typeof ApiPublicCoverPathRoute
@@ -494,6 +513,7 @@ export interface FileRouteTypes {
     | '/home-businesses'
     | '/mcp'
     | '/partners'
+    | '/portal'
     | '/privacy'
     | '/profile'
     | '/reset-password'
@@ -523,6 +543,7 @@ export interface FileRouteTypes {
     | '/api/public/cover'
     | '/api/public/event'
     | '/api/public/sheet-sync'
+    | '/api/public/subscription-expiry'
     | '/admin/'
     | '/admin/businesses/$id'
     | '/api/public/cover/$path'
@@ -545,6 +566,7 @@ export interface FileRouteTypes {
     | '/home-businesses'
     | '/mcp'
     | '/partners'
+    | '/portal'
     | '/privacy'
     | '/profile'
     | '/reset-password'
@@ -573,6 +595,7 @@ export interface FileRouteTypes {
     | '/api/public/cover'
     | '/api/public/event'
     | '/api/public/sheet-sync'
+    | '/api/public/subscription-expiry'
     | '/admin'
     | '/admin/businesses/$id'
     | '/api/public/cover/$path'
@@ -596,6 +619,7 @@ export interface FileRouteTypes {
     | '/home-businesses'
     | '/mcp'
     | '/partners'
+    | '/portal'
     | '/privacy'
     | '/profile'
     | '/reset-password'
@@ -625,6 +649,7 @@ export interface FileRouteTypes {
     | '/api/public/cover'
     | '/api/public/event'
     | '/api/public/sheet-sync'
+    | '/api/public/subscription-expiry'
     | '/_authenticated/admin/'
     | '/_authenticated/admin/businesses/$id'
     | '/api/public/cover/$path'
@@ -649,6 +674,7 @@ export interface RootRouteChildren {
   HomeBusinessesRoute: typeof HomeBusinessesRoute
   McpRoute: typeof McpRoute
   PartnersRoute: typeof PartnersRoute
+  PortalRoute: typeof PortalRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -665,6 +691,7 @@ export interface RootRouteChildren {
   ApiPublicCoverRoute: typeof ApiPublicCoverRouteWithChildren
   ApiPublicEventRoute: typeof ApiPublicEventRoute
   ApiPublicSheetSyncRoute: typeof ApiPublicSheetSyncRoute
+  ApiPublicSubscriptionExpiryRoute: typeof ApiPublicSubscriptionExpiryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -730,6 +757,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/partners': {
@@ -885,6 +919,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/api/public/subscription-expiry': {
+      id: '/api/public/subscription-expiry'
+      path: '/api/public/subscription-expiry'
+      fullPath: '/api/public/subscription-expiry'
+      preLoaderRoute: typeof ApiPublicSubscriptionExpiryRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/sheet-sync': {
       id: '/api/public/sheet-sync'
@@ -1104,6 +1145,7 @@ const rootRouteChildren: RootRouteChildren = {
   HomeBusinessesRoute: HomeBusinessesRoute,
   McpRoute: McpRoute,
   PartnersRoute: PartnersRoute,
+  PortalRoute: PortalRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResetPasswordRoute: ResetPasswordRoute,
@@ -1120,6 +1162,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCoverRoute: ApiPublicCoverRouteWithChildren,
   ApiPublicEventRoute: ApiPublicEventRoute,
   ApiPublicSheetSyncRoute: ApiPublicSheetSyncRoute,
+  ApiPublicSubscriptionExpiryRoute: ApiPublicSubscriptionExpiryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

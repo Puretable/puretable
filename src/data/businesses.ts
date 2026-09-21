@@ -1,4 +1,5 @@
 import restaurantImg from "@/assets/restaurant.jpg";
+import type { MenuItem } from "@/lib/owner-manage.schemas";
 import cafeImg from "@/assets/cafe.jpg";
 import bakeryImg from "@/assets/bakery.jpg";
 import homeImg from "@/assets/home-business.jpg";
@@ -137,6 +138,8 @@ export type Business = {
   createdAt?: string;
   links: BusinessLink[];
   branches: Branch[];
+  /** Gluten-free menu items (any plan). Loaded on the business page only. */
+  menu?: MenuItem[];
 };
 
 export const CATEGORY_COVER: Record<Category, string> = {

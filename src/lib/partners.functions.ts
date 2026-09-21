@@ -1,14 +1,15 @@
 /**
- * "انضم إلى Pure Table" — partner interest requests and the pre-launch
- * waitlist. Public server functions validate and store submissions; only an
- * admin can read, update the status, or delete them.
+ * Pre-launch waitlist (public sign-up) and the admin inbox for it and for
+ * partner interest requests received before the public form was retired in
+ * favour of the Business Owner Portal. Only an admin can read, update the
+ * status of, or delete stored requests.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAdmin } from "@/lib/businesses.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { notifyPartnerSubmission, notifyWaitlistSignup } from "@/lib/email.server";
+import { notifyWaitlistSignup } from "@/lib/email.server";
 
 export const LEAD_STATUSES = [
   "new",
@@ -26,42 +27,6 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   agreed: "تم الاتفاق",
   not_interested: "غير مهتم",
 };
-
-const LeadInput = z.object({
-  business_name: z.string().min(1).max(160),
-  business_type: z.string().max(80).nullish(),
-  city: z.string().max(80).nullish(),
-  contact_name: z.string().max(120).nullish(),
-  phone: z.string().max(40).nullish(),
-  email: z.string().email().max(255).or(z.literal("")).nullish(),
-  website: z.string().max(300).nullish(),
-  instagram: z.string().max(300).nullish(),
-  notes: z.string().max(2000).nullish(),
-});
-
-export const submitPartnerLead = createServerFn({ method: "POST" })
-  .validator((d: unknown) => LeadInput.parse(d))
-  .handler(async ({ data }) => {
-    const id = crypto.randomUUID();
-    const normalized = { ...data, email: data.email || null };
-    const { error } = await supabaseAdmin
-      .from("partner_leads")
-      .insert({ id, ...normalized, status: "new" });
-    if (error) throw new Error(error.message);
-    await notifyPartnerSubmission({
-      id,
-      businessName: data.business_name,
-      businessType: data.business_type,
-      city: data.city,
-      contactName: data.contact_name,
-      phone: data.phone,
-      email: normalized.email,
-      website: data.website,
-      instagram: data.instagram,
-      notes: data.notes,
-    });
-    return { ok: true };
-  });
 
 export const joinWaitlist = createServerFn({ method: "POST" })
   .validator((d: unknown) =>

@@ -14,7 +14,7 @@
     "bakeries": "Bakeries",
     "home_businesses": "Home Businesses",
     "contact": "Contact",
-    "list_business": "Join Us",
+    "owner_portal": "Business Owner Portal",
     "sign_in": "Sign in",
     "admin": "Admin",
     "desserts": "Desserts",
@@ -183,6 +183,8 @@
     "delivery_desc": "Places you can order from on HungerStation, Jahez, The Chefz, ToYou and Keeta."
   },
   "business": {
+    "gf_menu": "Gluten-free menu",
+    "gf_menu_note": "Menu details and safety levels are provided by the business and have not been verified by Pure Table. Please confirm with the staff before ordering.",
     "products": "Gluten-free products",
     "address": "Address",
     "open_in_maps": "Open in Google Maps",

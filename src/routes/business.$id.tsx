@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ogImageMeta } from "@/lib/seo";
 import { useTranslation } from "react-i18next";
+import { PublicMenu } from "@/components/site/MenuSection";
 import { useQuery } from "@tanstack/react-query";
 import {
   MapPin,
@@ -190,7 +191,7 @@ function BusinessDetail() {
   const description = b.description_i18n?.[lang] ?? b.description;
   const categoryLabel =
     categoryFilters.find((category) => category.value === b.category)?.label ?? b.category;
-  const whatsappMessage = pureTableWhatsAppMessage(lang);
+  const whatsappMessage = pureTableWhatsAppMessage();
   const discountCode = b.discountCode;
 
   // Home businesses ("أسر منتجة") are shown without any Google Maps location —
@@ -418,6 +419,8 @@ function BusinessDetail() {
                     {visibleDescription(b, description)}
                   </p>
                 )}
+
+                <PublicMenu items={b.menu ?? []} lang={lang} />
 
                 {gallery.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
