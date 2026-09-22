@@ -260,7 +260,17 @@
     "terms": "Terms & Conditions",
     "complaints": "Submit a Complaint",
     "faq": "Frequently Asked Questions",
+    "disclosure": "Business Disclosure",
     "follow_us": "Follow us"
+  },
+  "disclosure": {
+    "title": "Business Disclosure",
+    "business_name": "Trade name",
+    "owner_name": "Owner / partner name",
+    "cr_number": "Commercial Registration number",
+    "address": "Address",
+    "email": "Email",
+    "phone": "Phone"
   },
   "safety": {
     "safe_label": "Dedicated gluten-free — as reported",

@@ -87,8 +87,11 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const { t } = useTranslation();
-  const { text } = useSiteText();
+  const { text, settings } = useSiteText();
   const { secondary: cats } = useFilters();
+  // Deliberately not `shows()`: that helper defaults a toggle to visible when unset, which is
+  // backwards here — hidden until an admin explicitly activates it in Admin → Appearance.
+  const disclosureActive = settings.sections["disclosure_active"] === true;
   const email = text("contact_info.email");
   const phone = text("contact_info.phone");
   // Pure Table's official accounts, edited centrally in Admin → Appearance.
@@ -204,6 +207,13 @@ export function SiteFooter() {
                 {t("footer.faq")}
               </Link>
             </li>
+            {disclosureActive && (
+              <li>
+                <Link to="/disclosure" className="hover:text-foreground">
+                  {t("footer.disclosure")}
+                </Link>
+              </li>
+            )}
           </ul>
         </div>
       </div>
@@ -233,6 +243,7 @@ const PRELAUNCH_OPEN = [
   "/terms",
   "/complaints",
   "/faq",
+  "/disclosure",
   "/admin",
 ];
 

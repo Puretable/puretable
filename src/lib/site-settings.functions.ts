@@ -2,7 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAdmin } from "@/lib/businesses.server";
-import { AUTO_TRANSLATE_KEYS, normalizeSettings, type SiteContent, type SiteSettings } from "@/lib/site-settings";
+import {
+  AUTO_TRANSLATE_KEYS,
+  normalizeSettings,
+  type SiteContent,
+  type SiteSettings,
+} from "@/lib/site-settings";
 import { translateArabicToEnglish } from "@/lib/translate.server";
 
 const SiteSettingsInput = z
@@ -11,7 +16,12 @@ const SiteSettingsInput = z
   .refine(
     (value) => JSON.stringify(value).length <= 250_000,
     "إعدادات الموقع أكبر من الحد المسموح.",
-  );
+  )
+  .refine((value) => {
+    if (value.sections["disclosure_active"] !== true) return true;
+    const has = (key: string) => !!value.content[key]?.ar?.trim();
+    return has("disclosure_info.business_name") && has("disclosure_info.cr_number");
+  }, "لا يمكن تفعيل الإفصاح التجاري قبل إدخال الاسم التجاري ورقم السجل التجاري.");
 
 /**
  * For the fixed list of Arabic-only admin fields (`AUTO_TRANSLATE_KEYS`), regenerate the English

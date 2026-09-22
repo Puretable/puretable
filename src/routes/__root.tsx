@@ -25,7 +25,10 @@ import { PosthogAnalytics } from "../lib/posthog-analytics";
 import "../lib/i18n";
 import "../lib/stale-build-recovery";
 
-function NotFoundComponent() {
+/** Also used by routes that must look exactly like "not found" while a feature is switched off
+ * (e.g. /disclosure before an admin activates it), so an inactive feature is indistinguishable
+ * from a URL that never existed. */
+export function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">

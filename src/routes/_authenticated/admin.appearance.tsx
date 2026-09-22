@@ -6,6 +6,7 @@ import {
   AtSign,
   CheckCircle2,
   Image as ImageIcon,
+  Landmark,
   Loader2,
   Monitor,
   Palette,
@@ -98,6 +99,51 @@ const CONTACT_FIELDS = [
   },
 ] as const;
 
+/**
+ * Business Disclosure (الإفصاح التجاري) — a single value per field, entered by an admin. Never
+ * auto-translated: a legal name or registration number must be shown exactly as entered, so these
+ * keys are not in `AUTO_TRANSLATE_KEYS`. Hidden from the public page and the footer link until
+ * "activate" (`sections.disclosure_active`) is turned on — see `DisclosurePanel` below.
+ */
+const DISCLOSURE_FIELDS = [
+  {
+    key: "disclosure_info.business_name",
+    label: "الاسم التجاري",
+    type: "text" as const,
+    required: true,
+  },
+  {
+    key: "disclosure_info.owner_name",
+    label: "اسم المالك / الشريك (اختياري)",
+    type: "text" as const,
+    required: false,
+  },
+  {
+    key: "disclosure_info.cr_number",
+    label: "رقم السجل التجاري",
+    type: "text" as const,
+    required: true,
+  },
+  {
+    key: "disclosure_info.address",
+    label: "العنوان (اختياري)",
+    type: "text" as const,
+    required: false,
+  },
+  {
+    key: "disclosure_info.email",
+    label: "البريد الإلكتروني للتواصل (اختياري)",
+    type: "email" as const,
+    required: false,
+  },
+  {
+    key: "disclosure_info.phone",
+    label: "رقم الهاتف للتواصل (اختياري)",
+    type: "tel" as const,
+    required: false,
+  },
+] as const;
+
 function AppearancePage() {
   const queryClient = useQueryClient();
   const saved = useSiteSettings();
@@ -175,9 +221,20 @@ function AppearancePage() {
   }
 
   async function save() {
-    setBusy(true);
     setMessage(null);
     setError(null);
+    if (draft.sections["disclosure_active"] === true) {
+      const missing = DISCLOSURE_FIELDS.filter(
+        (field) => field.required && !(draft.content[field.key]?.ar ?? "").trim(),
+      );
+      if (missing.length) {
+        setError(
+          `أكمل الحقول التالية قبل تفعيل الإفصاح التجاري: ${missing.map((f) => f.label).join("، ")}.`,
+        );
+        return;
+      }
+    }
+    setBusy(true);
     const next: SiteSettings = {
       ...draft,
       theme: { ...draft.theme, primaryForeground: readableText(draft.theme.primary) },
@@ -494,6 +551,57 @@ function AppearancePage() {
             </div>
           ))}
         </div>
+      </Panel>
+
+      <Panel title="الإفصاح التجاري" icon={Landmark}>
+        <p className="text-sm text-muted-foreground">
+          معلومات الإفصاح التجاري الأساسية (الاسم، رقم السجل التجاري، والتواصل). القيم تُحفظ كما
+          تكتبها تماماً ولا تُترجم تلقائياً. الصفحة ورابطها في الفوتر مخفيّان تماماً — حتى عبر
+          الرابط المباشر — إلى أن تُفعّلهما من هنا بعد تعبئة الاسم التجاري ورقم السجل التجاري.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {DISCLOSURE_FIELDS.map((field) => (
+            <InputField
+              key={field.key}
+              label={field.label}
+              dir="rtl"
+              type={field.type}
+              value={draft.content[field.key]?.ar ?? ""}
+              placeholder=""
+              onChange={(value) => setText(field.key, "ar", value)}
+            />
+          ))}
+        </div>
+        <label className="flex items-start gap-3 rounded-2xl border border-border p-4 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4"
+            checked={draft.sections["disclosure_active"] === true}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                sections: { ...current.sections, disclosure_active: event.target.checked },
+              }))
+            }
+          />
+          <span>
+            <span className="block font-medium">تفعيل صفحة الإفصاح التجاري ورابطها في الفوتر</span>
+            <span className="block text-xs text-muted-foreground">
+              مخفية افتراضياً. عند التفعيل يتطلب الحفظ إدخال الاسم التجاري ورقم السجل التجاري على
+              الأقل.
+            </span>
+          </span>
+        </label>
+        {draft.sections["disclosure_active"] === true && (
+          <a
+            href="/disclosure"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+          >
+            معاينة الصفحة كما يراها الزائر
+          </a>
+        )}
       </Panel>
 
       <Panel title="معاينة سريعة">

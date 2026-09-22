@@ -26,6 +26,7 @@ import { Route as GoRouteImport } from './routes/go'
 import { Route as FeaturedRouteImport } from './routes/featured'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as DisclosureRouteImport } from './routes/disclosure'
 import { Route as DessertsRouteImport } from './routes/desserts'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ComplaintsRouteImport } from './routes/complaints'
@@ -145,6 +146,11 @@ const FavoritesRoute = FavoritesRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DisclosureRoute = DisclosureRouteImport.update({
+  id: '/disclosure',
+  path: '/disclosure',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DessertsRoute = DessertsRouteImport.update({
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/disclosure': typeof DisclosureRoute
   '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/disclosure': typeof DisclosureRoute
   '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
@@ -451,6 +459,7 @@ export interface FileRoutesById {
   '/complaints': typeof ComplaintsRoute
   '/contact': typeof ContactRoute
   '/desserts': typeof DessertsRoute
+  '/disclosure': typeof DisclosureRoute
   '/faq': typeof FaqRoute
   '/favorites': typeof FavoritesRoute
   '/featured': typeof FeaturedRoute
@@ -506,6 +515,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/disclosure'
     | '/faq'
     | '/favorites'
     | '/featured'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/disclosure'
     | '/faq'
     | '/favorites'
     | '/featured'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/contact'
     | '/desserts'
+    | '/disclosure'
     | '/faq'
     | '/favorites'
     | '/featured'
@@ -667,6 +679,7 @@ export interface RootRouteChildren {
   ComplaintsRoute: typeof ComplaintsRoute
   ContactRoute: typeof ContactRoute
   DessertsRoute: typeof DessertsRoute
+  DisclosureRoute: typeof DisclosureRoute
   FaqRoute: typeof FaqRoute
   FavoritesRoute: typeof FavoritesRoute
   FeaturedRoute: typeof FeaturedRoute
@@ -813,6 +826,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/disclosure': {
+      id: '/disclosure'
+      path: '/disclosure'
+      fullPath: '/disclosure'
+      preLoaderRoute: typeof DisclosureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/desserts': {
@@ -1138,6 +1158,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComplaintsRoute: ComplaintsRoute,
   ContactRoute: ContactRoute,
   DessertsRoute: DessertsRoute,
+  DisclosureRoute: DisclosureRoute,
   FaqRoute: FaqRoute,
   FavoritesRoute: FavoritesRoute,
   FeaturedRoute: FeaturedRoute,
