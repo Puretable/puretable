@@ -44,7 +44,7 @@ function HomeBiz() {
   return (
     <CategoryPage
       eyebrow={t("nav.home_businesses")}
-      title={t("pages.home_title")}
+      title={text("pages.home_title")}
       description={text("pages.home_desc")}
       items={data.filter((b) => hasCategory(b, "home"))}
     />

@@ -41,14 +41,14 @@ const WELCOME_FIELDS = [
   { key: "home.subtitle", label: "النص الترحيبي" },
 ] as const;
 
-/** The description shown at the top of each category listing page (/restaurants, /cafes, …). */
+/** The title and description shown at the top of each category listing page (/restaurants, /cafes, …). */
 const CATEGORY_DESC_FIELDS = [
-  { key: "pages.restaurants_desc", label: "المطاعم" },
-  { key: "pages.cafes_desc", label: "المقاهي" },
-  { key: "pages.bakeries_desc", label: "المخابز" },
-  { key: "pages.desserts_desc", label: "الحلويات" },
-  { key: "pages.home_desc", label: "الأسر المنتجة" },
-  { key: "pages.supermarkets_desc", label: "سوبرماركت" },
+  { key: "pages.restaurants_desc", titleKey: "pages.restaurants_title", label: "المطاعم" },
+  { key: "pages.cafes_desc", titleKey: "pages.cafes_title", label: "المقاهي" },
+  { key: "pages.bakeries_desc", titleKey: "pages.bakeries_title", label: "المخابز" },
+  { key: "pages.desserts_desc", titleKey: "pages.desserts_title", label: "الحلويات" },
+  { key: "pages.home_desc", titleKey: "pages.home_title", label: "الأسر المنتجة" },
+  { key: "pages.supermarkets_desc", titleKey: "pages.supermarkets_title", label: "سوبرماركت" },
 ] as const;
 
 /**
@@ -208,7 +208,10 @@ function AppearancePage() {
     setDraft((current) => {
       const content = { ...current.content };
       for (const field of WELCOME_FIELDS) delete content[field.key];
-      for (const field of CATEGORY_DESC_FIELDS) delete content[field.key];
+      for (const field of CATEGORY_DESC_FIELDS) {
+        delete content[field.key];
+        delete content[field.titleKey];
+      }
       for (const field of LEGAL_FIELDS) delete content[field.key];
       for (const field of CONTACT_FIELDS) delete content[field.key];
       const media = { ...current.layout.media };
@@ -413,28 +416,47 @@ function AppearancePage() {
         </div>
       </Panel>
 
-      <Panel title="أوصاف صفحات الفئات" icon={Tags}>
+      <Panel title="عناوين وأوصاف صفحات الفئات" icon={Tags}>
         <p className="text-sm text-muted-foreground">
-          الوصف الذي يظهر أعلى كل صفحة فئة (المطاعم، المقاهي، المخابز، الحلويات، الأسر المنتجة،
-          سوبرماركت). اكتب بالعربية فقط؛ تُنشأ الترجمة الإنجليزية تلقائياً عند الحفظ. هذا لا يغيّر
-          تصنيف الأمان الخاص بأي منشأة.
+          العنوان والوصف الظاهران أعلى كل صفحة فئة (المطاعم، المقاهي، المخابز، الحلويات، الأسر
+          المنتجة، سوبرماركت). اكتب بالعربية فقط؛ تُنشأ الترجمة الإنجليزية تلقائياً عند الحفظ. هذا
+          لا يغيّر تصنيف الأمان الخاص بأي منشأة.
         </p>
         <div className="space-y-5">
           {CATEGORY_DESC_FIELDS.map((field) => (
-            <div key={field.key} className="space-y-2 rounded-2xl border border-border p-4">
+            <div key={field.key} className="space-y-4 rounded-2xl border border-border p-4">
               <h3 className="text-sm font-semibold">{field.label}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label="العربية"
-                  dir="rtl"
-                  value={draft.content[field.key]?.ar ?? ""}
-                  placeholder={DEFAULT_TEXT.ar[field.key] ?? ""}
-                  onChange={(value) => setText(field.key, "ar", value)}
-                />
-                <TranslatedPreview
-                  value={draft.content[field.key]?.en ?? ""}
-                  placeholder={DEFAULT_TEXT.en[field.key] ?? ""}
-                />
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">العنوان</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="العربية"
+                    dir="rtl"
+                    value={draft.content[field.titleKey]?.ar ?? ""}
+                    placeholder={DEFAULT_TEXT.ar[field.titleKey] ?? ""}
+                    onChange={(value) => setText(field.titleKey, "ar", value)}
+                  />
+                  <TranslatedPreview
+                    value={draft.content[field.titleKey]?.en ?? ""}
+                    placeholder={DEFAULT_TEXT.en[field.titleKey] ?? ""}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">الوصف</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="العربية"
+                    dir="rtl"
+                    value={draft.content[field.key]?.ar ?? ""}
+                    placeholder={DEFAULT_TEXT.ar[field.key] ?? ""}
+                    onChange={(value) => setText(field.key, "ar", value)}
+                  />
+                  <TranslatedPreview
+                    value={draft.content[field.key]?.en ?? ""}
+                    placeholder={DEFAULT_TEXT.en[field.key] ?? ""}
+                  />
+                </div>
               </div>
             </div>
           ))}

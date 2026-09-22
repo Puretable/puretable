@@ -192,11 +192,17 @@ export const AUTO_TRANSLATE_KEYS = [
   "home.subtitle",
   "legal.privacy_body",
   "legal.terms_body",
+  "pages.restaurants_title",
   "pages.restaurants_desc",
+  "pages.cafes_title",
   "pages.cafes_desc",
+  "pages.bakeries_title",
   "pages.bakeries_desc",
+  "pages.desserts_title",
   "pages.desserts_desc",
+  "pages.home_title",
   "pages.home_desc",
+  "pages.supermarkets_title",
   "pages.supermarkets_desc",
 ] as const;
 

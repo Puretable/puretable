@@ -48,7 +48,7 @@ function Supermarkets() {
   return (
     <CategoryPage
       eyebrow={t("nav.supermarkets")}
-      title={t("pages.supermarkets_title")}
+      title={text("pages.supermarkets_title")}
       description={text("pages.supermarkets_desc")}
       items={data.filter((b) => hasCategory(b, "supermarket"))}
     />

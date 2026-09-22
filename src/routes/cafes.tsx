@@ -44,7 +44,7 @@ function Cafes() {
   return (
     <CategoryPage
       eyebrow={t("nav.cafes")}
-      title={t("pages.cafes_title")}
+      title={text("pages.cafes_title")}
       description={text("pages.cafes_desc")}
       items={data.filter((b) => hasCategory(b, "cafe"))}
     />
