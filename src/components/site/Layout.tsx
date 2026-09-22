@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Instagram, Mail, Phone, UserRound, Music2, MessageCircle, Heart } from "lucide-react";
-import { emailHref, instagramHref, tiktokHref, whatsappHref } from "@/lib/contact";
+import { instagramHref, tiktokHref, whatsappHref } from "@/lib/contact";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { LogoMark } from "./Logo";
@@ -110,7 +110,7 @@ export function SiteFooter() {
       icon: MessageCircle,
       href: whatsappHref(val("contact_info.whatsapp")),
     },
-    { key: "email", label: "Email", icon: Mail, href: emailHref(val("contact_info.email")) },
+    // Email is not repeated here — it already appears once, as an icon + address, under "Get in touch".
   ].filter((s): s is typeof s & { href: string } => !!s.href);
   return (
     <footer className="mt-24 border-t border-border/60 bg-secondary/40">

@@ -180,6 +180,26 @@ export const TEXT_GROUPS: TextGroup[] = (() => {
 
 export const DEFAULT_TEXT = { en: FLAT_EN, ar: FLAT_AR };
 
+/**
+ * Content keys the admin edits in Arabic only — the English side is generated automatically on
+ * save (see `saveSiteSettings`) and never typed by hand. Keep this in sync with the field lists in
+ * `admin.appearance.tsx`; both reference these exact dotted keys.
+ */
+export const AUTO_TRANSLATE_KEYS = [
+  "home.badge",
+  "home.title_1",
+  "home.title_2",
+  "home.subtitle",
+  "legal.privacy_body",
+  "legal.terms_body",
+  "pages.restaurants_desc",
+  "pages.cafes_desc",
+  "pages.bakeries_desc",
+  "pages.desserts_desc",
+  "pages.home_desc",
+  "pages.supermarkets_desc",
+] as const;
+
 /** Turn dotted overrides into a nested i18next resource bundle. */
 export function toResourceBundle(content: SiteContent, lang: "en" | "ar") {
   const bundle: Record<string, unknown> = {};

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ogImageMeta } from "@/lib/seo";
 import { useTranslation } from "react-i18next";
+import { useSiteText } from "@/hooks/use-site-settings";
 import { useQuery } from "@tanstack/react-query";
 import { CategoryPage } from "@/components/site/CategoryPage";
 import { hasCategory } from "@/data/businesses";
@@ -42,12 +43,13 @@ export const Route = createFileRoute("/supermarkets")({
 
 function Supermarkets() {
   const { t } = useTranslation();
+  const { text } = useSiteText();
   const { data = [] } = useQuery({ queryKey: ["businesses"], queryFn: () => listBusinesses() });
   return (
     <CategoryPage
       eyebrow={t("nav.supermarkets")}
       title={t("pages.supermarkets_title")}
-      description={t("pages.supermarkets_desc")}
+      description={text("pages.supermarkets_desc")}
       items={data.filter((b) => hasCategory(b, "supermarket"))}
     />
   );

@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Save,
   ScrollText,
+  Tags,
   Upload,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,16 @@ const WELCOME_FIELDS = [
   { key: "home.title_1", label: "العنوان الرئيسي — السطر الأول" },
   { key: "home.title_2", label: "العنوان الرئيسي — السطر الملوّن" },
   { key: "home.subtitle", label: "النص الترحيبي" },
+] as const;
+
+/** The description shown at the top of each category listing page (/restaurants, /cafes, …). */
+const CATEGORY_DESC_FIELDS = [
+  { key: "pages.restaurants_desc", label: "المطاعم" },
+  { key: "pages.cafes_desc", label: "المقاهي" },
+  { key: "pages.bakeries_desc", label: "المخابز" },
+  { key: "pages.desserts_desc", label: "الحلويات" },
+  { key: "pages.home_desc", label: "الأسر المنتجة" },
+  { key: "pages.supermarkets_desc", label: "سوبرماركت" },
 ] as const;
 
 /**
@@ -171,15 +182,17 @@ function AppearancePage() {
       ...draft,
       theme: { ...draft.theme, primaryForeground: readableText(draft.theme.primary) },
     };
+    let saved: Awaited<ReturnType<typeof saveSettings>>;
     try {
-      await saveSettings({ data: { settings: next } });
+      saved = await saveSettings({ data: { settings: next } });
     } catch (caught) {
       setBusy(false);
       setError(caught instanceof Error ? caught.message : "تعذر حفظ إعدادات الموقع.");
       return;
     }
     setBusy(false);
-    setDraft(next);
+    // The server may have regenerated English translations — reflect exactly what was stored.
+    setDraft({ ...next, content: saved.content });
     logAudit("publish_settings", "site_settings", "default");
     await queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
     setMessage("تم حفظ الهوية ونشرها على الموقع.");
@@ -189,6 +202,7 @@ function AppearancePage() {
     setDraft((current) => {
       const content = { ...current.content };
       for (const field of WELCOME_FIELDS) delete content[field.key];
+      for (const field of CATEGORY_DESC_FIELDS) delete content[field.key];
       for (const field of LEGAL_FIELDS) delete content[field.key];
       for (const field of CONTACT_FIELDS) delete content[field.key];
       const media = { ...current.layout.media };
@@ -367,6 +381,10 @@ function AppearancePage() {
       </Panel>
 
       <Panel title="النصوص الترحيبية">
+        <p className="text-sm text-muted-foreground">
+          اكتب النص بالعربية فقط. تُنشأ الترجمة الإنجليزية تلقائياً عند «حفظ ونشر» وتظهر للزوار عند
+          التبديل إلى English.
+        </p>
         <div className="space-y-5">
           {WELCOME_FIELDS.map((field) => (
             <div key={field.key} className="space-y-2 rounded-2xl border border-border p-4">
@@ -379,12 +397,37 @@ function AppearancePage() {
                   placeholder={DEFAULT_TEXT.ar[field.key] ?? ""}
                   onChange={(value) => setText(field.key, "ar", value)}
                 />
-                <TextField
-                  label="English"
-                  dir="ltr"
+                <TranslatedPreview
                   value={draft.content[field.key]?.en ?? ""}
                   placeholder={DEFAULT_TEXT.en[field.key] ?? ""}
-                  onChange={(value) => setText(field.key, "en", value)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="أوصاف صفحات الفئات" icon={Tags}>
+        <p className="text-sm text-muted-foreground">
+          الوصف الذي يظهر أعلى كل صفحة فئة (المطاعم، المقاهي، المخابز، الحلويات، الأسر المنتجة،
+          سوبرماركت). اكتب بالعربية فقط؛ تُنشأ الترجمة الإنجليزية تلقائياً عند الحفظ. هذا لا يغيّر
+          تصنيف الأمان الخاص بأي منشأة.
+        </p>
+        <div className="space-y-5">
+          {CATEGORY_DESC_FIELDS.map((field) => (
+            <div key={field.key} className="space-y-2 rounded-2xl border border-border p-4">
+              <h3 className="text-sm font-semibold">{field.label}</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  label="العربية"
+                  dir="rtl"
+                  value={draft.content[field.key]?.ar ?? ""}
+                  placeholder={DEFAULT_TEXT.ar[field.key] ?? ""}
+                  onChange={(value) => setText(field.key, "ar", value)}
+                />
+                <TranslatedPreview
+                  value={draft.content[field.key]?.en ?? ""}
+                  placeholder={DEFAULT_TEXT.en[field.key] ?? ""}
                 />
               </div>
             </div>
@@ -395,8 +438,8 @@ function AppearancePage() {
       <Panel title="النصوص القانونية" icon={ScrollText}>
         <p className="text-sm text-muted-foreground">
           محتوى صفحتي «سياسة الخصوصية» و«الشروط والأحكام». النص الافتراضي موجود في ملفات الترجمة —
-          اكتب فوقه ثم اضغط «حفظ ونشر» ليتحدّث ما يراه الزائر فوراً. الفراغات بين الفقرات والسطور
-          تُحفظ كما هي.
+          اكتب فوقه بالعربية فقط ثم اضغط «حفظ ونشر»؛ تُنشأ الترجمة الإنجليزية تلقائياً. الفراغات بين
+          الفقرات والسطور تُحفظ كما هي.
         </p>
         <div className="space-y-5">
           {LEGAL_FIELDS.map((field) => (
@@ -411,13 +454,10 @@ function AppearancePage() {
                   placeholder={DEFAULT_TEXT.ar[field.key] ?? ""}
                   onChange={(value) => setText(field.key, "ar", value)}
                 />
-                <LongTextField
-                  label="English"
-                  dir="ltr"
+                <TranslatedPreview
                   rows={14}
                   value={draft.content[field.key]?.en ?? ""}
                   placeholder={DEFAULT_TEXT.en[field.key] ?? ""}
-                  onChange={(value) => setText(field.key, "en", value)}
                 />
               </div>
               <a
@@ -698,6 +738,38 @@ function TextField({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+      />
+    </label>
+  );
+}
+
+/**
+ * Read-only preview of the auto-generated English text (see `AUTO_TRANSLATE_KEYS`). Shown next to
+ * the Arabic field the admin actually edits, so nothing about the translation is hidden — it just
+ * isn't typed by hand. Filled in after the next save; empty beforehand.
+ */
+function TranslatedPreview({
+  value,
+  placeholder,
+  rows = 3,
+}: {
+  value: string;
+  placeholder: string;
+  rows?: number;
+}) {
+  return (
+    <label className="space-y-1.5">
+      <span className="text-xs font-medium text-muted-foreground">
+        English <span className="text-muted-foreground/70">(ترجمة تلقائية)</span>
+      </span>
+      <textarea
+        readOnly
+        dir="ltr"
+        rows={rows}
+        value={value}
+        placeholder={value ? undefined : "ستُنشأ الترجمة تلقائياً بعد الحفظ — " + placeholder}
+        title="تُنشأ هذه الترجمة تلقائياً من النص العربي عند الحفظ"
+        className="w-full cursor-default resize-y rounded-xl border border-dashed border-border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground outline-none"
       />
     </label>
   );
