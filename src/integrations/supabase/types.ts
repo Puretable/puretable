@@ -454,6 +454,42 @@ export type Database = {
         };
         Relationships: [];
       };
+      business_disclosure: {
+        Row: {
+          id: string;
+          active: boolean;
+          business_name: string | null;
+          owner_name: string | null;
+          cr_number: string | null;
+          address: string | null;
+          email: string | null;
+          phone: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          active?: boolean;
+          business_name?: string | null;
+          owner_name?: string | null;
+          cr_number?: string | null;
+          address?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          active?: boolean;
+          business_name?: string | null;
+          owner_name?: string | null;
+          cr_number?: string | null;
+          address?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       complaints: {
         Row: {
           admin_notes: string | null;

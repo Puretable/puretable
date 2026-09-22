@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   AtSign,
@@ -24,6 +24,11 @@ import { DEFAULT_LOGO_URL } from "@/lib/brand";
 import heroImageFallback from "@/assets/hero.jpg";
 import { logAudit } from "@/lib/audit";
 import { saveSiteSettings, setSiteLive } from "@/lib/site-settings.functions";
+import {
+  getDisclosureAdmin,
+  saveDisclosure,
+  type DisclosureRecord,
+} from "@/lib/disclosure.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/appearance")({
   component: AppearancePage,
@@ -96,51 +101,6 @@ const CONTACT_FIELDS = [
     placeholder: "05xxxxxxxx أو wa.me/9665xxxxxxxx",
     type: "text" as const,
     help: "يظهر كأيقونة WhatsApp في الفوتر.",
-  },
-] as const;
-
-/**
- * Business Disclosure (الإفصاح التجاري) — a single value per field, entered by an admin. Never
- * auto-translated: a legal name or registration number must be shown exactly as entered, so these
- * keys are not in `AUTO_TRANSLATE_KEYS`. Hidden from the public page and the footer link until
- * "activate" (`sections.disclosure_active`) is turned on — see `DisclosurePanel` below.
- */
-const DISCLOSURE_FIELDS = [
-  {
-    key: "disclosure_info.business_name",
-    label: "الاسم التجاري",
-    type: "text" as const,
-    required: true,
-  },
-  {
-    key: "disclosure_info.owner_name",
-    label: "اسم المالك / الشريك (اختياري)",
-    type: "text" as const,
-    required: false,
-  },
-  {
-    key: "disclosure_info.cr_number",
-    label: "رقم السجل التجاري",
-    type: "text" as const,
-    required: true,
-  },
-  {
-    key: "disclosure_info.address",
-    label: "العنوان (اختياري)",
-    type: "text" as const,
-    required: false,
-  },
-  {
-    key: "disclosure_info.email",
-    label: "البريد الإلكتروني للتواصل (اختياري)",
-    type: "email" as const,
-    required: false,
-  },
-  {
-    key: "disclosure_info.phone",
-    label: "رقم الهاتف للتواصل (اختياري)",
-    type: "tel" as const,
-    required: false,
   },
 ] as const;
 
@@ -223,17 +183,6 @@ function AppearancePage() {
   async function save() {
     setMessage(null);
     setError(null);
-    if (draft.sections["disclosure_active"] === true) {
-      const missing = DISCLOSURE_FIELDS.filter(
-        (field) => field.required && !(draft.content[field.key]?.ar ?? "").trim(),
-      );
-      if (missing.length) {
-        setError(
-          `أكمل الحقول التالية قبل تفعيل الإفصاح التجاري: ${missing.map((f) => f.label).join("، ")}.`,
-        );
-        return;
-      }
-    }
     setBusy(true);
     const next: SiteSettings = {
       ...draft,
@@ -553,56 +502,7 @@ function AppearancePage() {
         </div>
       </Panel>
 
-      <Panel title="الإفصاح التجاري" icon={Landmark}>
-        <p className="text-sm text-muted-foreground">
-          معلومات الإفصاح التجاري الأساسية (الاسم، رقم السجل التجاري، والتواصل). القيم تُحفظ كما
-          تكتبها تماماً ولا تُترجم تلقائياً. الصفحة ورابطها في الفوتر مخفيّان تماماً — حتى عبر
-          الرابط المباشر — إلى أن تُفعّلهما من هنا بعد تعبئة الاسم التجاري ورقم السجل التجاري.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {DISCLOSURE_FIELDS.map((field) => (
-            <InputField
-              key={field.key}
-              label={field.label}
-              dir="rtl"
-              type={field.type}
-              value={draft.content[field.key]?.ar ?? ""}
-              placeholder=""
-              onChange={(value) => setText(field.key, "ar", value)}
-            />
-          ))}
-        </div>
-        <label className="flex items-start gap-3 rounded-2xl border border-border p-4 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4"
-            checked={draft.sections["disclosure_active"] === true}
-            onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                sections: { ...current.sections, disclosure_active: event.target.checked },
-              }))
-            }
-          />
-          <span>
-            <span className="block font-medium">تفعيل صفحة الإفصاح التجاري ورابطها في الفوتر</span>
-            <span className="block text-xs text-muted-foreground">
-              مخفية افتراضياً. عند التفعيل يتطلب الحفظ إدخال الاسم التجاري ورقم السجل التجاري على
-              الأقل.
-            </span>
-          </span>
-        </label>
-        {draft.sections["disclosure_active"] === true && (
-          <a
-            href="/disclosure"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-          >
-            معاينة الصفحة كما يراها الزائر
-          </a>
-        )}
-      </Panel>
+      <DisclosurePanel />
 
       <Panel title="معاينة سريعة">
         <div className="grid items-center gap-6 overflow-hidden rounded-3xl border border-border bg-background p-5 sm:grid-cols-2">
@@ -672,6 +572,155 @@ function readableText(background: string) {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, "#141414")
     ? "#ffffff"
     : "#141414";
+}
+
+const EMPTY_DISCLOSURE: DisclosureRecord = {
+  active: false,
+  business_name: null,
+  owner_name: null,
+  cr_number: null,
+  address: null,
+  email: null,
+  phone: null,
+};
+
+const DISCLOSURE_LABELS: {
+  key: keyof Omit<DisclosureRecord, "active">;
+  label: string;
+  type: "text" | "email" | "tel";
+  required: boolean;
+}[] = [
+  { key: "business_name", label: "الاسم التجاري", type: "text", required: true },
+  { key: "owner_name", label: "اسم المالك / الشريك (اختياري)", type: "text", required: false },
+  { key: "cr_number", label: "رقم السجل التجاري", type: "text", required: true },
+  { key: "address", label: "العنوان (اختياري)", type: "text", required: false },
+  { key: "email", label: "البريد الإلكتروني للتواصل (اختياري)", type: "email", required: false },
+  { key: "phone", label: "رقم الهاتف للتواصل (اختياري)", type: "tel", required: false },
+];
+
+/**
+ * Business Disclosure (الإفصاح التجاري). Deliberately independent of the rest of this page's
+ * `draft`/`saveSiteSettings` flow: it reads and writes its own dedicated, RLS-protected table (see
+ * the migration) instead of `site_settings.content`, so a draft can never leak into every page's
+ * public payload before an admin activates it. Values are never auto-translated: a legal name or
+ * registration number must be shown exactly as entered.
+ */
+function DisclosurePanel() {
+  const queryClient = useQueryClient();
+  const load = useServerFn(getDisclosureAdmin);
+  const save = useServerFn(saveDisclosure);
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-disclosure"],
+    queryFn: () => load(),
+  });
+  const [form, setForm] = useState<DisclosureRecord>(EMPTY_DISCLOSURE);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (data && !loadedOnce) {
+      setForm(data);
+      setLoadedOnce(true);
+    }
+  }, [data, loadedOnce]);
+
+  async function onSave() {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const saved = await save({ data: form });
+      setForm(saved);
+      setMessage("تم الحفظ.");
+      await queryClient.invalidateQueries({ queryKey: ["admin-disclosure"] });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر الحفظ.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title="الإفصاح التجاري" icon={Landmark}>
+      <p className="text-sm text-muted-foreground">
+        معلومات الإفصاح التجاري الأساسية (الاسم، رقم السجل التجاري، والتواصل). القيم تُحفظ كما
+        تكتبها تماماً ولا تُترجم تلقائياً. الصفحة ورابطها في الفوتر مخفيّان تماماً عن الجميع سوى
+        الأدمن — حتى عبر الرابط المباشر — إلى أن تُفعّلهما من هنا بعد تعبئة الاسم التجاري ورقم السجل
+        التجاري.
+      </p>
+      {isLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          جارٍ التحميل…
+        </p>
+      ) : (
+        <fieldset disabled={busy} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {DISCLOSURE_LABELS.map((field) => (
+              <InputField
+                key={field.key}
+                label={field.label}
+                dir="rtl"
+                type={field.type}
+                value={form[field.key] ?? ""}
+                placeholder=""
+                onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+              />
+            ))}
+          </div>
+          <label className="flex items-start gap-3 rounded-2xl border border-border p-4 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4"
+              checked={form.active}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, active: event.target.checked }))
+              }
+            />
+            <span>
+              <span className="block font-medium">
+                تفعيل صفحة الإفصاح التجاري ورابطها في الفوتر
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                مخفية افتراضياً. لا يمكن التفعيل قبل إدخال الاسم التجاري ورقم السجل التجاري.
+              </span>
+            </span>
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onSave()}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            >
+              {busy ? "جارٍ الحفظ…" : "حفظ"}
+            </button>
+            {form.active && (
+              <a
+                href="/disclosure"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+              >
+                معاينة الصفحة كما يراها الزائر
+              </a>
+            )}
+          </div>
+          {message && (
+            <p role="status" className="text-xs text-primary">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          )}
+        </fieldset>
+      )}
+    </Panel>
+  );
 }
 
 function Panel({

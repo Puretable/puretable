@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
 import { Page } from "@/components/site/Layout";
-import { useSiteSettings } from "@/hooks/use-site-settings";
 import { usePageView } from "@/hooks/use-page-view";
 import { emailHref } from "@/lib/contact";
+import { getDisclosurePublic } from "@/lib/disclosure.functions";
 import { NotFoundComponent } from "./__root";
 
 export const Route = createFileRoute("/disclosure")({
@@ -15,12 +17,10 @@ export const Route = createFileRoute("/disclosure")({
 });
 
 /**
- * Fields the admin enters at Admin → Appearance → "الإفصاح التجاري". Stored under a
- * `disclosure_info.*` content key — deliberately NOT `disclosure.*`, which is the i18n namespace
- * for this page's static labels below; site_settings content overrides i18n strings at the same
- * dotted key (see `toResourceBundle`), so sharing the namespace would silently replace each label
- * with the admin-entered value instead of showing both. Never machine-translated either way: a
- * legal/commercial name or registration number must be shown exactly as entered.
+ * Static UI labels shown next to each admin-entered value below. Kept in the `disclosure.*` i18n
+ * namespace; the actual VALUES come from the `business_disclosure` table (row-level security, not
+ * this page) so a draft can never be visible before an admin activates it — see the migration and
+ * `disclosure.functions.ts` for why this is a dedicated table rather than site-wide content.
  */
 const FIELD_KEYS = [
   "business_name",
@@ -34,18 +34,22 @@ const FIELD_KEYS = [
 function DisclosurePage() {
   const { t } = useTranslation();
   usePageView();
-  const settings = useSiteSettings();
-  // Deliberately not `shows()`: that helper defaults a toggle to visible when unset, which is
-  // backwards here — the disclosure page must default to hidden until an admin turns it on.
-  const active = settings.sections["disclosure_active"] === true;
-  if (!active) return <NotFoundComponent />;
+  const load = useServerFn(getDisclosurePublic);
+  const { data, isLoading } = useQuery({
+    queryKey: ["disclosure-public"],
+    queryFn: () => load(),
+  });
 
-  const value = (key: (typeof FIELD_KEYS)[number]) =>
-    settings.content[`disclosure_info.${key}`]?.ar?.trim() ?? "";
+  // While loading, render nothing rather than a flash of "not found" or the real data.
+  if (isLoading) return null;
+  // RLS filters the row out entirely while inactive — `data` is `null` either way, so an inactive
+  // page and a URL that never existed are indistinguishable, including to a direct visit.
+  if (!data) return <NotFoundComponent />;
+
   const rows = FIELD_KEYS.map((key) => ({
     key,
     label: t(`disclosure.${key}`),
-    value: value(key),
+    value: data[key] ?? "",
   })).filter((row) => row.value);
 
   return (

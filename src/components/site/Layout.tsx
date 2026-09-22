@@ -1,5 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Instagram, Mail, Phone, UserRound, Music2, MessageCircle, Heart } from "lucide-react";
 import { instagramHref, tiktokHref, whatsappHref } from "@/lib/contact";
 import { useTranslation } from "react-i18next";
@@ -9,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSiteText } from "@/hooks/use-site-settings";
 import { useFilters } from "@/lib/filters";
 import { track } from "@/lib/track";
+import { getDisclosurePublic } from "@/lib/disclosure.functions";
 import { ComingSoon } from "./ComingSoon";
 import { DeveloperCredit } from "./DeveloperCredit";
 
@@ -87,11 +90,18 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const { t } = useTranslation();
-  const { text, settings } = useSiteText();
+  const { text } = useSiteText();
   const { secondary: cats } = useFilters();
-  // Deliberately not `shows()`: that helper defaults a toggle to visible when unset, which is
-  // backwards here — hidden until an admin explicitly activates it in Admin → Appearance.
-  const disclosureActive = settings.sections["disclosure_active"] === true;
+  const loadDisclosure = useServerFn(getDisclosurePublic);
+  // Row Level Security (not this check) is the real confidentiality boundary: the query returns
+  // `null` while inactive, exactly like a real visitor gets nothing back from the database. See
+  // disclosure.functions.ts.
+  const { data: disclosure } = useQuery({
+    queryKey: ["disclosure-public"],
+    queryFn: () => loadDisclosure(),
+    staleTime: 60_000,
+  });
+  const disclosureActive = !!disclosure;
   const email = text("contact_info.email");
   const phone = text("contact_info.phone");
   // Pure Table's official accounts, edited centrally in Admin → Appearance.
