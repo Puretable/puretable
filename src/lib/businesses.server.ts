@@ -165,7 +165,9 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
 async function fetchPublicMenu(client: SupabaseClient, businessId: string): Promise<MenuItem[]> {
   const { data, error } = await client
     .from("business_menu_items")
-    .select("id, business_id, name, name_ar, price, currency, photo_url, safety, sort_order")
+    .select(
+      "id, business_id, name, name_ar, description, description_ar, price, currency, photo_url, safety, sort_order",
+    )
     .eq("business_id", businessId)
     .order("sort_order")
     .order("created_at");

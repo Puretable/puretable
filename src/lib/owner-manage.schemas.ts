@@ -204,6 +204,8 @@ export const MenuItemInput = z.object({
   business_id: z.string().uuid(),
   name: req(120),
   name_ar: opt(120),
+  description: opt(500),
+  description_ar: opt(500),
   // Optional: some items are priced by size or variety. Stored with two decimals, in SAR.
   price: z.preprocess(
     (v) => (v === "" || v === undefined ? null : v),
@@ -220,6 +222,8 @@ export type MenuItem = {
   business_id: string;
   name: string;
   name_ar: string | null;
+  description: string | null;
+  description_ar: string | null;
   price: number | null;
   currency: string;
   photo_url: string | null;

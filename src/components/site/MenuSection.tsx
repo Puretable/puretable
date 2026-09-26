@@ -29,6 +29,8 @@ export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string })
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((item) => {
           const name = lang === "ar" ? item.name_ar || item.name : item.name;
+          const description =
+            lang === "ar" ? item.description_ar || item.description : item.description;
           const price = formatMenuPrice(item, lang);
           return (
             <li key={item.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
@@ -47,6 +49,9 @@ export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string })
                     <span className="shrink-0 text-sm font-semibold text-primary">{price}</span>
                   )}
                 </div>
+                {description && (
+                  <p className="break-words text-xs text-muted-foreground">{description}</p>
+                )}
                 <MenuSafetyBadge level={item.safety} />
               </div>
             </li>

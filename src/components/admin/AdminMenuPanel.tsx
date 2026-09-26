@@ -19,7 +19,9 @@ export function AdminMenuPanel({ businessId }: { businessId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("business_menu_items" as never)
-        .select("id,business_id,name,name_ar,price,currency,photo_url,safety,sort_order")
+        .select(
+          "id,business_id,name,name_ar,description,description_ar,price,currency,photo_url,safety,sort_order",
+        )
         .eq("business_id", businessId)
         .order("sort_order")
         .order("created_at");

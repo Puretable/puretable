@@ -28,12 +28,22 @@ type Draft = {
   id?: string;
   name: string;
   name_ar: string;
+  description: string;
+  description_ar: string;
   price: string;
   photo_url: string | null;
   safety: MenuSafety;
 };
 
-const EMPTY: Draft = { name: "", name_ar: "", price: "", photo_url: null, safety: "red" };
+const EMPTY: Draft = {
+  name: "",
+  name_ar: "",
+  description: "",
+  description_ar: "",
+  price: "",
+  photo_url: null,
+  safety: "red",
+};
 
 /**
  * Gluten-free menu editor. Same component for owners (portal) and admins (business page): the caller
@@ -63,6 +73,8 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
             id: item.id,
             name: item.name,
             name_ar: item.name_ar ?? "",
+            description: item.description ?? "",
+            description_ar: item.description_ar ?? "",
             price: item.price === null ? "" : String(item.price),
             photo_url: item.photo_url,
             safety: item.safety,
@@ -104,13 +116,15 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
       business_id: businessId,
       name: draft.name,
       name_ar: draft.name_ar,
+      description: draft.description,
+      description_ar: draft.description_ar,
       price,
       photo_url: draft.photo_url,
       safety: draft.safety,
       sort_order: draft.id ? (items.find((i) => i.id === draft.id)?.sort_order ?? 0) : items.length,
     });
     if (!parsed.success || (price !== null && Number.isNaN(price))) {
-      setError("راجع اسم الصنف والسعر (أرقام فقط) ولا تستخدم الرمزين < >.");
+      setError("راجع اسم الصنف ووصفه والسعر (أرقام فقط) ولا تستخدم الرمزين < >.");
       return;
     }
     setBusy(true);
@@ -150,7 +164,8 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
             قائمة الطعام الخالية من الجلوتين
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            تظهر أصنافك لزوار صفحتك في جميع الباقات. أنت المسؤول عن دقة الاسم والسعر ومستوى الأمان.
+            تظهر أصنافك لزوار صفحتك (ميزة باقتي Pro وPremium). أنت المسؤول عن دقة الاسم والسعر
+            ومستوى الأمان.
           </p>
         </div>
         {!disabled && !draft && (
@@ -209,6 +224,27 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
                 maxLength={120}
                 value={draft.name_ar}
                 onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-background p-3"
+              />
+            </label>
+            <label className="block text-sm">
+              وصف الصنف (English)
+              <textarea
+                maxLength={500}
+                rows={3}
+                dir="ltr"
+                value={draft.description}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                className="mt-2 w-full rounded-xl border bg-background p-3"
+              />
+            </label>
+            <label className="block text-sm">
+              وصف الصنف بالعربية
+              <textarea
+                maxLength={500}
+                rows={3}
+                value={draft.description_ar}
+                onChange={(e) => setDraft({ ...draft, description_ar: e.target.value })}
                 className="mt-2 w-full rounded-xl border bg-background p-3"
               />
             </label>
@@ -350,6 +386,11 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
                     </span>
                   )}
                 </div>
+                {(item.description_ar || item.description) && (
+                  <p className="break-words text-xs text-muted-foreground">
+                    {item.description_ar || item.description}
+                  </p>
+                )}
                 <MenuSafetyBadge level={item.safety} />
                 {!disabled && (
                   <div className="flex gap-2 pt-1">
