@@ -10,6 +10,7 @@ import {
   type OwnerLinkInput,
   type OwnerPhotosInput,
 } from "./owner-manage.schemas";
+import { canUseMenu } from "./plans";
 
 /**
  * Owner self-service operations.
@@ -230,8 +231,21 @@ export async function deleteOwnerLink(actor: Actor, businessId: string, id: stri
   return { ok: true as const };
 }
 
+/** Menu items are Pro/Premium only. Admins may still manage any business on its owner's behalf. */
+async function assertMenuAllowed(actor: Actor, businessId: string, access: Access) {
+  if (access.admin) return;
+  const { data, error } = await actor.adminClient
+    .from("businesses")
+    .select("plan")
+    .eq("id", businessId)
+    .single();
+  if (error || !data) throw new Error("Forbidden");
+  if (!canUseMenu(data)) throw new Error("Menu items require a Pro or Premium plan");
+}
+
 export async function saveMenuItem(actor: Actor, input: MenuItemInput) {
   const access = await requireOwnerOrAdmin(actor, input.business_id);
+  await assertMenuAllowed(actor, input.business_id, access);
   const { id, business_id, price, ...rest } = input;
   const fields = {
     ...rest,
@@ -284,7 +298,8 @@ export async function saveMenuItem(actor: Actor, input: MenuItemInput) {
 }
 
 export async function deleteMenuItem(actor: Actor, businessId: string, id: string) {
-  await requireOwnerOrAdmin(actor, businessId);
+  const access = await requireOwnerOrAdmin(actor, businessId);
+  await assertMenuAllowed(actor, businessId, access);
   const { error } = await actor.adminClient
     .from("business_menu_items")
     .delete()

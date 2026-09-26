@@ -242,6 +242,10 @@ const MESSAGES: [pattern: RegExp, message: string][] = [
   [/branch limit reached/i, "وصلت إلى الحد الأقصى للفروع في باقتك. أخفِ فرعاً أو ارفع الباقة."],
   [/photo limit reached/i, "وصلت إلى الحد الأقصى للصور في باقتك."],
   [/photo must be uploaded/i, "ارفع الصور من خلال البوابة."],
+  [
+    /require a pro or premium/i,
+    "إضافة أصناف القائمة الخالية من الجلوتين متاحة في باقتي Pro وPremium.",
+  ],
   [/menu item limit/i, "وصلت إلى الحد الأقصى لأصناف القائمة (200)."],
   [/only jpg, png/i, "الصور المسموحة: JPG أو PNG أو WebP أو GIF."],
   [/too many uploads/i, "عدد كبير من الرفع. حاول لاحقاً."],

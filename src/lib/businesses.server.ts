@@ -1,6 +1,6 @@
 import { readPlanCatalog } from "./subscriptions.server";
 import { toFeatures } from "./subscriptions";
-import { planOf } from "./plans";
+import { canUseMenu, planOf } from "./plans";
 import type { MenuItem } from "./owner-manage.schemas";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -142,7 +142,7 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
     ]);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
-  const menu = await fetchPublicMenu(client, row.id);
+  const menu = canUseMenu(row) ? await fetchPublicMenu(client, row.id) : [];
   const mappedLinks = (links ?? []).map(mapLink);
   const business = mapDbBusiness(
     row as never,
@@ -158,7 +158,7 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
 }
 
 /**
- * Gluten-free menu items, shown on every plan. A failure here must never take the business page
+ * Gluten-free menu items, shown on Pro and Premium only. A failure here must never take the business page
  * down (for example while a deployment is ahead of its database migration), so it degrades to an
  * empty menu.
  */

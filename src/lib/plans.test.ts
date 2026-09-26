@@ -28,3 +28,11 @@ describe("subscription plan rules", () => {
     assert.equal(branchLimitLabel("premium"), "غير محدود");
   });
 });
+
+test("gluten-free menu items are Pro and Premium only", async () => {
+  const { canUseMenu } = await import("./plans");
+  assert.equal(canUseMenu({ plan: "free" }), false);
+  assert.equal(canUseMenu(null), false);
+  assert.equal(canUseMenu({ plan: "pro" }), true);
+  assert.equal(canUseMenu({ plan: "premium" }), true);
+});

@@ -490,7 +490,22 @@ try {
     "links: add, edit, delete; share text is cleaned; cannot use or touch another business's branch/link",
   );
 
-  console.log("Gluten-free menu (Free plan)");
+  console.log("Gluten-free menu (Free blocked, Pro allowed)");
+  await rejects(
+    saveMenuItem(
+      ownerActor,
+      parseMenu({ business_id: A, name: "Blocked", price: 1, safety: "green" }),
+    ),
+    /Pro or Premium/,
+    "Free owner adding a menu item",
+  );
+  await rejects(
+    deleteMenuItem(ownerActor, A, "00000000-0000-0000-0000-000000000000"),
+    /Pro or Premium/,
+    "Free owner deleting a menu item",
+  );
+  step("menu: a Free-plan owner cannot add or manage menu items (server-side)");
+  ok(await service.from("businesses").update({ plan: "pro" }).eq("id", A));
   const item = await saveMenuItem(
     ownerActor,
     parseMenu({
@@ -518,7 +533,7 @@ try {
   );
   assert.equal(noPrice.price, null);
   step(
-    "menu: owner adds and edits items on the Free plan, with all three existing safety colours and optional price",
+    "menu: a Pro owner adds and edits items, with all three existing safety colours and optional price",
   );
 
   assert.ok(
@@ -650,6 +665,7 @@ try {
       .like("name", "Filler %"),
   );
   step("menu: capped at 200 items per business");
+  ok(await service.from("businesses").update({ plan: "free" }).eq("id", A));
 
   console.log("Subscriptions, suspension and reactivation");
   // Upgrade through the normal request + admin approval flow.

@@ -93,6 +93,11 @@ export function planOf(b: PlanAccess | null | undefined): PlanTier {
 
 export type PlanAccess = { plan?: string | null; entitlements?: PlanFeatures };
 
+/** Gluten-free menu items are a paid feature: Pro and Premium only. */
+export function canUseMenu(b: PlanAccess | null | undefined): boolean {
+  return planOf(b) !== "free";
+}
+
 export function featuresOf(b: PlanAccess | null | undefined): PlanFeatures {
   return b?.entitlements ?? PLAN_FEATURES[planOf(b)];
 }

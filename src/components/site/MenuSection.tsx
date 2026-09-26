@@ -16,7 +16,7 @@ export function MenuSafetyBadge({ level }: { level: MenuSafety }) {
   );
 }
 
-/** Public gluten-free menu on the business page. Shown on every plan. */
+/** Public gluten-free menu on the business page. Pro and Premium only (the server omits it for Free). */
 export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string }) {
   const { t } = useTranslation();
   if (!items.length) return null;
