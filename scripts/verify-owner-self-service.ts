@@ -966,6 +966,223 @@ try {
     "the owner can edit again after reactivation; suspend/reactivate are recorded in the audit log",
   );
 
+  console.log("Business billing info (post-payment step)");
+  // The first-ever PAID activation requires the post-payment step; a plain approval (payment not
+  // required, as used above) never does.
+  ok(
+    await owner.client.rpc("request_business_plan", {
+      _business_id: A,
+      _plan: "premium",
+      _period_months: 1,
+    }),
+  );
+  const pendingBilling = ok(
+    await service
+      .from("business_subscriptions")
+      .select("id")
+      .eq("business_id", A)
+      .eq("status", "pending")
+      .single(),
+  );
+  ok(
+    await staff.client.rpc("admin_activate_subscription", {
+      _id: pendingBilling.id,
+      _payment_status: "paid",
+    }),
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("business_info_completed").eq("id", A).single())
+      .business_info_completed,
+    false,
+    "first paid activation requires the post-payment step",
+  );
+  const hiddenFromPublic = await anonClient()
+    .from("businesses")
+    .select("id")
+    .eq("id", A)
+    .maybeSingle();
+  assert.equal(
+    hiddenFromPublic.data,
+    null,
+    "a published business stays invisible to the public until the step is completed",
+  );
+  step("the first paid plan activation hides the business from the public and requires the step");
+
+  await rejects(
+    (async () =>
+      ok(
+        await owner.client.rpc("save_business_billing_fields", {
+          _business_id: A,
+          _trade_name: "",
+          _cr_number: "CR-1",
+          _tax_number: null,
+          _address: "Riyadh",
+          _email: "owner@example.com",
+          _phone: "0500000000",
+          _representative_name: "Owner Name",
+          _representative_title: "Owner",
+        }),
+      ))(),
+    /All fields are required/,
+    "submitting with a blank required field",
+  );
+  await rejects(
+    (async () =>
+      ok(
+        await stranger.client.rpc("save_business_billing_fields", {
+          _business_id: A,
+          _trade_name: "x",
+          _cr_number: "x",
+          _tax_number: null,
+          _address: "x",
+          _email: "x@example.com",
+          _phone: "x",
+          _representative_name: "x",
+          _representative_title: "x",
+        }),
+      ))(),
+    /Forbidden/,
+    "a stranger cannot submit another business's billing info",
+  );
+  // Phase 2 refuses before phase 1 (saving billing fields) has happened.
+  await rejects(
+    (async () =>
+      ok(
+        await owner.client.rpc("accept_partnership_agreement", {
+          _business_id: A,
+          _terms_version: "v1",
+        }),
+      ))(),
+    /Billing fields have not been saved yet/,
+    "accepting before billing fields are saved",
+  );
+  ok(
+    await owner.client.rpc("save_business_billing_fields", {
+      _business_id: A,
+      _trade_name: "QA Trading Est.",
+      _cr_number: "CR-12345",
+      _tax_number: null,
+      _address: "King Fahd Rd, Riyadh",
+      _email: "owner@example.com",
+      _phone: "0500000000",
+      _representative_name: "QA Owner",
+      _representative_title: "Owner",
+    }),
+  );
+  const savedFields = ok(
+    await service
+      .from("businesses")
+      .select(
+        "business_info_completed, invoice_trade_name, invoice_cr_number, invoice_tax_number, invoice_address, invoice_email, invoice_phone, invoice_representative_name, invoice_representative_title, terms_accepted_at",
+      )
+      .eq("id", A)
+      .single(),
+  );
+  assert.equal(
+    savedFields.business_info_completed,
+    false,
+    "saving fields alone does not complete the step",
+  );
+  assert.equal(savedFields.invoice_trade_name, "QA Trading Est.");
+  assert.equal(savedFields.invoice_cr_number, "CR-12345");
+  assert.equal(savedFields.invoice_tax_number, null, "an empty tax number is stored as null");
+  assert.equal(savedFields.invoice_representative_name, "QA Owner");
+  assert.equal(savedFields.terms_accepted_at, null);
+  step(
+    "phase 1: an owner saves billing fields; an empty tax number stays null; the step stays incomplete",
+  );
+
+  await rejects(
+    (async () =>
+      ok(
+        await stranger.client.rpc("accept_partnership_agreement", {
+          _business_id: A,
+          _terms_version: "v1",
+        }),
+      ))(),
+    /Forbidden/,
+    "a stranger cannot accept another business's agreement",
+  );
+  ok(
+    await owner.client.rpc("accept_partnership_agreement", {
+      _business_id: A,
+      _terms_version: "v1",
+    }),
+  );
+  const completed = ok(
+    await service
+      .from("businesses")
+      .select("business_info_completed, terms_accepted_at, terms_version")
+      .eq("id", A)
+      .single(),
+  );
+  assert.equal(completed.business_info_completed, true);
+  assert.equal(completed.terms_version, "v1");
+  assert.ok(completed.terms_accepted_at, "terms acceptance is timestamped");
+  const visibleAgain = await anonClient().from("businesses").select("id").eq("id", A).maybeSingle();
+  assert.ok(visibleAgain.data, "the business is visible to the public again once completed");
+  step(
+    "phase 2: accepting the generated agreement completes the step; the business becomes visible again",
+  );
+
+  // A later routine upgrade never re-asks: info is already on file.
+  ok(
+    await owner.client.rpc("request_business_plan", {
+      _business_id: A,
+      _plan: "pro",
+      _period_months: 1,
+    }),
+  );
+  const pendingSecond = ok(
+    await service
+      .from("business_subscriptions")
+      .select("id")
+      .eq("business_id", A)
+      .eq("status", "pending")
+      .single(),
+  );
+  ok(
+    await staff.client.rpc("admin_activate_subscription", {
+      _id: pendingSecond.id,
+      _payment_status: "paid",
+    }),
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("business_info_completed").eq("id", A).single())
+      .business_info_completed,
+    true,
+    "a later paid upgrade does not re-gate a business that already has info on file",
+  );
+  step("a routine later upgrade never re-asks for the already-completed step");
+
+  const billingRows = ok(await staff.client.rpc("admin_list_business_billing")) as Array<{
+    id: string;
+    invoice_status: string;
+    terms_accepted_at: string | null;
+  }>;
+  const billingRow = billingRows.find((r) => r.id === A);
+  assert.ok(billingRow, "the business appears in the admin billing list");
+  assert.equal(billingRow!.invoice_status, "not_sent");
+  assert.ok(
+    billingRow!.terms_accepted_at,
+    "the admin list shows the agreement acceptance timestamp",
+  );
+  await rejects(
+    (async () =>
+      ok(
+        await owner.client.rpc("admin_set_invoice_status", { _business_id: A, _status: "sent" }),
+      ))(),
+    /Forbidden/,
+    "a non-admin cannot set the invoice status",
+  );
+  ok(await staff.client.rpc("admin_set_invoice_status", { _business_id: A, _status: "sent" }));
+  assert.equal(
+    ok(await service.from("businesses").select("invoice_status").eq("id", A).single())
+      .invoice_status,
+    "sent",
+  );
+  step("the admin invoice toggle saves immediately and is admin-only");
+
   console.log(`\nAll ${checks} checks passed.`);
 } finally {
   if (created.objects.length) await service.storage.from("business-covers").remove(created.objects);

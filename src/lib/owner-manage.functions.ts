@@ -4,9 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { allow } from "./rate-limit.server";
 import {
+  acceptPartnershipAgreement,
   deleteMenuItem,
   deleteOwnerBranch,
   deleteOwnerLink,
+  saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
   saveOwnerLink,
@@ -16,6 +18,8 @@ import {
   type Actor,
 } from "./owner-manage.server";
 import {
+  AcceptAgreementInput,
+  BillingFieldsInput,
   MenuItemInput,
   OwnerBranchInput,
   OwnerBusinessInput,
@@ -67,6 +71,22 @@ export const saveOwnerBusiness = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     updateOwnerBusiness(await actorFor(context), data.businessId, data.business),
   );
+
+export const saveBusinessBillingFieldsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => BillingFieldsInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { business_id, ...rest } = data;
+    return saveBusinessBillingFields(await actorFor(context), business_id, rest);
+  });
+
+export const acceptPartnershipAgreementFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AcceptAgreementInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { business_id, ...rest } = data;
+    return acceptPartnershipAgreement(await actorFor(context), business_id, rest);
+  });
 
 export const saveOwnerPhotosFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

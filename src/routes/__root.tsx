@@ -50,7 +50,7 @@ export function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   return (
@@ -161,7 +161,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { dehydratedState } = Route.useLoaderData();
+  const { dehydratedState } = Route.useLoaderData() ?? {};
 
   // Outbound /go links get the anonymous visitor/session ids at click time.
   useEffect(() => installGoAugmenter(), []);

@@ -199,6 +199,32 @@ export const OwnerLinkInput = LinkInput.extend({
 });
 export type OwnerLinkInput = z.infer<typeof OwnerLinkInput>;
 
+/**
+ * The required post-payment step, in two phases:
+ *  1. BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative.
+ *     Saving this also generates the filled Partnership Agreement PDF.
+ *  2. AcceptAgreementInput — accepting the PDF just generated, which actually completes the step.
+ */
+export const AGREEMENT_TERMS_VERSION = "v1";
+export const BillingFieldsInput = z.object({
+  business_id: z.string().uuid(),
+  trade_name: req(200),
+  cr_number: req(50),
+  tax_number: opt(50),
+  address: req(300),
+  email: z.string().trim().toLowerCase().max(320).pipe(z.email("أدخل بريداً إلكترونياً صحيحاً.")),
+  phone: req(40),
+  representative_name: req(200),
+  representative_title: req(100),
+});
+export type BillingFieldsInput = z.infer<typeof BillingFieldsInput>;
+
+export const AcceptAgreementInput = z.object({
+  business_id: z.string().uuid(),
+  agree: z.literal(true, { message: "يجب الموافقة على الاتفاقية للمتابعة." }),
+});
+export type AcceptAgreementInput = z.infer<typeof AcceptAgreementInput>;
+
 export const MenuItemInput = z.object({
   id: z.string().uuid().optional(),
   business_id: z.string().uuid(),
@@ -303,6 +329,7 @@ export type OwnerBusinessDetail = {
   precautions_note: string | null;
   cover_url: string | null;
   photos: string[];
+  business_info_completed: boolean;
   business_links: OwnerLinkRow[];
   business_branches: OwnerBranchRow[];
   business_menu_items: MenuItem[];

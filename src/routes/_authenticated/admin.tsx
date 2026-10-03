@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   HelpCircle,
   MessageSquareWarning,
+  ReceiptText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -39,6 +40,7 @@ const groups = [
       { to: "/admin/businesses", label: "الأعمال والفروع", icon: Store, exact: false },
       { to: "/admin/categories", label: "التصنيفات", icon: Tags, exact: false },
       { to: "/admin/subscriptions", label: "الاشتراكات والباقات", icon: Layers, exact: false },
+      { to: "/admin/business-info", label: "بيانات الفوترة", icon: ReceiptText, exact: false },
       { to: "/admin/success-partners", label: "شركاء الانطلاق", icon: Award, exact: false },
     ],
   },

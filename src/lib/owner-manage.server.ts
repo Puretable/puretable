@@ -4,12 +4,16 @@ import {
   assertPhotoLimit,
   ownerUploadPrefix,
   safetyFieldsChanged,
+  AGREEMENT_TERMS_VERSION,
+  type AcceptAgreementInput,
+  type BillingFieldsInput,
   type MenuItemInput,
   type OwnerBranchInput,
   type OwnerBusinessInput,
   type OwnerLinkInput,
   type OwnerPhotosInput,
 } from "./owner-manage.schemas";
+import { fillAgreementTemplate } from "./agreement/fill-template";
 import { canUseMenu } from "./plans";
 
 /**
@@ -136,6 +140,57 @@ export async function updateOwnerPhotos(actor: Actor, businessId: string, input:
     .single();
   if (error) throw new Error(friendlyDbError(error.message));
   return data;
+}
+
+/**
+ * Phase 1 of the required post-payment step: save the billing fields, then return the Partnership
+ * Agreement filled with exactly those fields, rendered as a normal page (not a generated file) for
+ * the owner to read in phase 2. Ownership and the "all fields required" check are enforced again in
+ * `save_business_billing_fields` itself, so a direct RPC call can never bypass them. Does not
+ * complete the step — see `acceptPartnershipAgreement`.
+ */
+export async function saveBusinessBillingFields(
+  actor: Actor,
+  businessId: string,
+  input: Omit<BillingFieldsInput, "business_id">,
+) {
+  const { error } = await actor.userClient.rpc("save_business_billing_fields", {
+    _business_id: businessId,
+    _trade_name: input.trade_name,
+    _cr_number: input.cr_number,
+    _tax_number: input.tax_number ?? null,
+    _address: input.address,
+    _email: input.email,
+    _phone: input.phone,
+    _representative_name: input.representative_name,
+    _representative_title: input.representative_title,
+  });
+  if (error) throw new Error(friendlyDbError(error.message));
+
+  const agreementHtml = fillAgreementTemplate({
+    tradeName: input.trade_name,
+    crNumber: input.cr_number,
+    taxNumber: input.tax_number ?? null,
+    address: input.address,
+    email: input.email,
+    representativeName: input.representative_name,
+    representativeTitle: input.representative_title,
+  });
+  return { agreementHtml };
+}
+
+/** Phase 2: accept the agreement reviewed in phase 1. This is what actually unblocks the portal. */
+export async function acceptPartnershipAgreement(
+  actor: Actor,
+  businessId: string,
+  _input: Omit<AcceptAgreementInput, "business_id">,
+) {
+  const { error } = await actor.userClient.rpc("accept_partnership_agreement", {
+    _business_id: businessId,
+    _terms_version: AGREEMENT_TERMS_VERSION,
+  });
+  if (error) throw new Error(friendlyDbError(error.message));
+  return { ok: true as const };
 }
 
 export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {

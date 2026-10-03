@@ -21,6 +21,7 @@ const business = (over: Partial<OwnerBusiness> = {}): OwnerBusiness => ({
   published: true,
   plan: "free",
   cover_url: null,
+  business_info_completed: true,
   entitlements: {
     branch_limit: 1,
     photo_limit: 1,

@@ -49,6 +49,7 @@ export type OwnerBusiness = {
   published: boolean;
   plan: PlanTier;
   cover_url: string | null;
+  business_info_completed: boolean;
   entitlements: {
     branch_limit: number | null;
     photo_limit: number;
@@ -242,6 +243,7 @@ const MESSAGES: [pattern: RegExp, message: string][] = [
   [/branch limit reached/i, "وصلت إلى الحد الأقصى للفروع في باقتك. أخفِ فرعاً أو ارفع الباقة."],
   [/photo limit reached/i, "وصلت إلى الحد الأقصى للصور في باقتك."],
   [/photo must be uploaded/i, "ارفع الصور من خلال البوابة."],
+  [/all fields are required/i, "جميع الحقول مطلوبة لإكمال بيانات الفوترة."],
   [
     /require a pro or premium/i,
     "إضافة أصناف القائمة الخالية من الجلوتين متاحة في باقتي Pro وPremium.",

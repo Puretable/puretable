@@ -17,6 +17,7 @@ import {
   Utensils,
 } from "lucide-react";
 import { Page } from "@/components/site/Layout";
+import { BusinessInfoGate } from "@/components/portal/BusinessInfoGate";
 import { OwnerLogin } from "@/components/portal/OwnerLogin";
 import { OwnerAnalytics } from "@/components/portal/OwnerAnalytics";
 import { PlanPicker } from "@/components/portal/PlanPicker";
@@ -164,6 +165,20 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
               </Link>
             </>
           )}
+        </div>
+      </section>
+    );
+
+  if (!business.business_info_completed)
+    return (
+      <section dir="rtl" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        {header}
+        <div className="mt-8">
+          <BusinessInfoGate
+            business={business}
+            accountEmail={email}
+            onDone={() => void overview.refetch()}
+          />
         </div>
       </section>
     );

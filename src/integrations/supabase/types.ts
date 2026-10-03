@@ -315,6 +315,18 @@ export type Database = {
           hours: Json;
           id: string;
           instagram: string | null;
+          invoice_address: string | null;
+          invoice_cr_number: string | null;
+          invoice_email: string | null;
+          invoice_phone: string | null;
+          invoice_status: string;
+          invoice_trade_name: string | null;
+          invoice_tax_number: string | null;
+          invoice_representative_name: string | null;
+          invoice_representative_title: string | null;
+          business_info_completed: boolean;
+          terms_accepted_at: string | null;
+          terms_version: string | null;
           lat: number | null;
           lng: number | null;
           maps_url: string | null;
@@ -359,6 +371,18 @@ export type Database = {
           hours?: Json;
           id?: string;
           instagram?: string | null;
+          invoice_address?: string | null;
+          invoice_cr_number?: string | null;
+          invoice_email?: string | null;
+          invoice_phone?: string | null;
+          invoice_status?: string;
+          invoice_trade_name?: string | null;
+          invoice_tax_number?: string | null;
+          invoice_representative_name?: string | null;
+          invoice_representative_title?: string | null;
+          business_info_completed?: boolean;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
           lat?: number | null;
           lng?: number | null;
           maps_url?: string | null;
@@ -403,6 +427,18 @@ export type Database = {
           hours?: Json;
           id?: string;
           instagram?: string | null;
+          invoice_address?: string | null;
+          invoice_cr_number?: string | null;
+          invoice_email?: string | null;
+          invoice_phone?: string | null;
+          invoice_status?: string;
+          invoice_trade_name?: string | null;
+          invoice_tax_number?: string | null;
+          invoice_representative_name?: string | null;
+          invoice_representative_title?: string | null;
+          business_info_completed?: boolean;
+          terms_accepted_at?: string | null;
+          terms_version?: string | null;
           lat?: number | null;
           lng?: number | null;
           maps_url?: string | null;
@@ -911,6 +947,29 @@ export type Database = {
     };
     Functions: {
       admin_dashboard: { Args: { _since: string }; Returns: Json };
+      admin_list_business_billing: { Args: never; Returns: Json };
+      admin_set_invoice_status: {
+        Args: { _business_id: string; _status: string };
+        Returns: undefined;
+      };
+      save_business_billing_fields: {
+        Args: {
+          _business_id: string;
+          _trade_name: string;
+          _cr_number: string;
+          _tax_number: string | null;
+          _address: string;
+          _email: string;
+          _phone: string;
+          _representative_name: string;
+          _representative_title: string;
+        };
+        Returns: undefined;
+      };
+      accept_partnership_agreement: {
+        Args: { _business_id: string; _terms_version: string };
+        Returns: undefined;
+      };
       business_report: {
         Args: { _business_id: string; _since: string };
         Returns: Json;
@@ -942,12 +1001,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -967,13 +1026,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -992,13 +1050,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1017,13 +1074,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -1034,13 +1090,12 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
