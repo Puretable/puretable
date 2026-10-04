@@ -33,6 +33,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RestaurantsRouteImport } from './routes/restaurants'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SupermarketsRouteImport } from './routes/supermarkets'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -181,6 +182,11 @@ const RestaurantsRoute = RestaurantsRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -371,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/restaurants': typeof RestaurantsRoute
   '/search': typeof SearchRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supermarkets': typeof SupermarketsRoute
   '/terms': typeof TermsRoute
@@ -426,6 +433,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/restaurants': typeof RestaurantsRoute
   '/search': typeof SearchRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supermarkets': typeof SupermarketsRoute
   '/terms': typeof TermsRoute
@@ -482,6 +490,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/restaurants': typeof RestaurantsRoute
   '/search': typeof SearchRoute
+  '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/supermarkets': typeof SupermarketsRoute
   '/terms': typeof TermsRoute
@@ -539,6 +548,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/restaurants'
     | '/search'
+    | '/signup'
     | '/sitemap.xml'
     | '/supermarkets'
     | '/terms'
@@ -594,6 +604,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/restaurants'
     | '/search'
+    | '/signup'
     | '/sitemap.xml'
     | '/supermarkets'
     | '/terms'
@@ -649,6 +660,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/restaurants'
     | '/search'
+    | '/signup'
     | '/sitemap.xml'
     | '/supermarkets'
     | '/terms'
@@ -706,6 +718,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   RestaurantsRoute: typeof RestaurantsRoute
   SearchRoute: typeof SearchRoute
+  SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupermarketsRoute: typeof SupermarketsRoute
   TermsRoute: typeof TermsRoute
@@ -888,6 +901,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -1194,6 +1214,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   RestaurantsRoute: RestaurantsRoute,
   SearchRoute: SearchRoute,
+  SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupermarketsRoute: SupermarketsRoute,
   TermsRoute: TermsRoute,

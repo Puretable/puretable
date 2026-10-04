@@ -8,6 +8,7 @@ import {
   deleteMenuItem,
   deleteOwnerBranch,
   deleteOwnerLink,
+  getFirstLoginAgreement,
   saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
@@ -78,6 +79,15 @@ export const saveBusinessBillingFieldsFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { business_id, ...rest } = data;
     return saveBusinessBillingFields(await actorFor(context), business_id, rest);
+  });
+
+export const getFirstLoginAgreementFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ businessId: uuid }).parse(input))
+  .handler(async ({ data, context }) => {
+    const claims = (context as { claims?: { email?: unknown } }).claims;
+    const email = typeof claims?.email === "string" ? claims.email : null;
+    return getFirstLoginAgreement(await actorFor(context), data.businessId, email);
   });
 
 export const acceptPartnershipAgreementFn = createServerFn({ method: "POST" })

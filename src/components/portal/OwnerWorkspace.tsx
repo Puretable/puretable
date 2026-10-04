@@ -209,17 +209,17 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
         </section>
       )}
 
-      {tab === "menu" && overview.plan === "free" && (
+      {tab === "menu" && !overview.entitlements.menu && (
         <section className="space-y-3 rounded-2xl border border-dashed p-6 text-center">
           <h2 className="text-xl font-semibold">قائمة الطعام الخالية من الجلوتين</h2>
           <p className="text-sm text-muted-foreground">
-            إضافة أصناف القائمة الخالية من الجلوتين (الاسم والوصف والسعر والصور) ميزة مدفوعة متاحة
-            في باقتي Pro وPremium. قم بالترقية لعرض قائمتك للزوار.
+            إضافة أصناف القائمة الخالية من الجلوتين (الاسم والوصف والسعر والصور) غير متاحة حالياً
+            لصفحتك.
           </p>
         </section>
       )}
 
-      {tab === "menu" && overview.plan !== "free" && (
+      {tab === "menu" && overview.entitlements.menu && (
         <MenuManager
           businessId={businessId}
           items={menu}

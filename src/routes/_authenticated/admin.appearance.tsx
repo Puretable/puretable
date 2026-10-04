@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   AtSign,
   CheckCircle2,
+  Crown,
   Image as ImageIcon,
   Landmark,
   Loader2,
@@ -23,7 +24,7 @@ import { applyTheme, DEFAULT_SETTINGS, DEFAULT_TEXT, type SiteSettings } from "@
 import { DEFAULT_LOGO_URL } from "@/lib/brand";
 import heroImageFallback from "@/assets/hero.jpg";
 import { logAudit } from "@/lib/audit";
-import { saveSiteSettings, setSiteLive } from "@/lib/site-settings.functions";
+import { saveSiteSettings, setPackagesEnabled, setSiteLive } from "@/lib/site-settings.functions";
 import {
   getDisclosureAdmin,
   saveDisclosure,
@@ -110,6 +111,7 @@ function AppearancePage() {
   const signUpload = useServerFn(signCoverUploadUrl);
   const saveSettings = useServerFn(saveSiteSettings);
   const updateSiteLive = useServerFn(setSiteLive);
+  const updatePackagesEnabled = useServerFn(setPackagesEnabled);
   const [draft, setDraft] = useState<SiteSettings>(saved);
   const [busy, setBusy] = useState(false);
   const [launchReady, setLaunchReady] = useState(false);
@@ -259,6 +261,33 @@ function AppearancePage() {
     }
   }
 
+  async function togglePackages() {
+    const enabled = draft.sections.packages_enabled === true;
+    const next = !enabled;
+    if (
+      !window.confirm(
+        next
+          ? "تفعيل الباقات؟ ستظهر الاشتراكات ومقارنة الباقات لأصحاب الأعمال، وسيُطلب منهم استكمال كل بيانات الفوترة قبل الاشتراك في باقة مدفوعة."
+          : "تعطيل الباقات مؤقتاً؟ ستحصل كل الأعمال تلقائياً على مزايا Premium مجاناً، وتُخفى شاشات الاشتراك والباقات عن أصحاب الأعمال، ويُطلب منهم فقط الاسم التجاري ورقم السجل التجاري. لا يُحذف أي شيء من البيانات أو الكود.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { sections } = await updatePackagesEnabled({ data: { enabled: next } });
+      setDraft((previous) => ({ ...previous, sections }));
+      await queryClient.invalidateQueries({ queryKey: SITE_SETTINGS_KEY });
+      logAudit(next ? "enable_packages" : "disable_packages", "site_settings", "default");
+      setMessage(next ? "تم تفعيل الباقات." : "تم تعطيل الباقات مؤقتاً.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر تغيير حالة الباقات.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -323,6 +352,34 @@ function AppearancePage() {
             : draft.sections.site_live === false
               ? "إطلاق الموقع وإخفاء صفحة قريباً"
               : "إعادة تفعيل صفحة قريباً"}
+        </button>
+      </Panel>
+
+      <Panel title="الباقات والاشتراكات" icon={Crown}>
+        <p className="text-sm font-medium">
+          {!launchReady
+            ? "جارٍ تحميل حالة الباقات…"
+            : draft.sections.packages_enabled === true
+              ? "الباقات مفعّلة"
+              : "الباقات معطّلة مؤقتاً — كل الأعمال على مزايا Premium مجاناً"}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          عند التعطيل: تُخفى شاشات الاشتراك والباقات وسجلّها عن أصحاب الأعمال، تحصل كل الأعمال
+          تلقائياً على مزايا Premium الكاملة مجاناً، ويقتصر نموذج بيانات العمل بعد الموافقة على
+          الاتفاقية على الاسم التجاري ورقم السجل التجاري فقط. لا يتغيّر أي شيء في قاعدة البيانات أو
+          الكود — فقط العرض للمالك.
+        </p>
+        <button
+          type="button"
+          disabled={busy || !launchReady}
+          onClick={() => void togglePackages()}
+          className="mt-4 rounded-full bg-primary px-5 py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {busy
+            ? "جارٍ الحفظ…"
+            : draft.sections.packages_enabled === true
+              ? "تعطيل الباقات مؤقتاً"
+              : "تفعيل الباقات"}
         </button>
       </Panel>
 

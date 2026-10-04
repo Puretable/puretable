@@ -970,6 +970,10 @@ export type Database = {
         Args: { _business_id: string; _terms_version: string };
         Returns: undefined;
       };
+      signup_create_business: {
+        Args: { _business_name: string; _email: string };
+        Returns: string;
+      };
       business_report: {
         Args: { _business_id: string; _since: string };
         Returns: Json;

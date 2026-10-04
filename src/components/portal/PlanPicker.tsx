@@ -134,6 +134,7 @@ export function PlanPicker({
         {PLAN_TIERS.map((tier) => {
           const move = planMove(business.plan, tier);
           const isPendingTier = pending?.plan === tier;
+          const requiresBillingInfo = tier !== "free" && !business.business_info_completed;
           return (
             <article
               key={tier}
@@ -148,21 +149,28 @@ export function PlanPicker({
                   <Check className="h-4 w-4" /> باقتك الحالية
                 </p>
               ) : (
-                <button
-                  type="button"
-                  disabled={busy !== null || isPendingTier}
-                  onClick={() => void choose(tier)}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
-                >
-                  {busy === tier && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isPendingTier
-                    ? "الطلب قيد المراجعة"
-                    : tier === "free"
-                      ? "الانتقال إلى Free"
-                      : move === "upgrade"
-                        ? "طلب الترقية"
-                        : "طلب الانتقال"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled={busy !== null || isPendingTier || requiresBillingInfo}
+                    onClick={() => void choose(tier)}
+                    className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {busy === tier && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {isPendingTier
+                      ? "الطلب قيد المراجعة"
+                      : tier === "free"
+                        ? "الانتقال إلى Free"
+                        : move === "upgrade"
+                          ? "طلب الترقية"
+                          : "طلب الانتقال"}
+                  </button>
+                  {requiresBillingInfo && (
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                      أكمل بيانات الفوترة للاشتراك
+                    </p>
+                  )}
+                </>
               )}
             </article>
           );

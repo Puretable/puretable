@@ -55,6 +55,50 @@ export const requestOwnerCode = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+/**
+ * Fully open self-service signup: creates a new, unpublished business and links the given email as
+ * its owner, then immediately sends that email a sign-in code — same mechanism as `requestOwnerCode`,
+ * just without needing the owner to already exist first. The business starts exactly like any
+ * admin-created one (Free plan, unpublished until an admin reviews it) and still needs the owner to
+ * accept the Partnership Agreement on first login before reaching the dashboard.
+ */
+export const signupCreateBusiness = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        businessName: z
+          .string()
+          .trim()
+          .min(1)
+          .max(200)
+          .regex(/^[^<>]*$/, "Angle brackets are not allowed"),
+        email: emailSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const request = getRequest();
+    if (
+      !allow(clientKey(request, "signup"), 5, 600_000) ||
+      !allow(`signup:${data.email}`, 3, 600_000)
+    ) {
+      throw new Error("محاولات كثيرة. انتظر بضع دقائق ثم حاول مجدداً.");
+    }
+    const client = publicClient();
+    const { error } = await client.rpc("signup_create_business", {
+      _business_name: data.businessName,
+      _email: data.email,
+    });
+    if (error) throw new Error(error.message);
+    const origin = (process.env["APP_URL"] || new URL(request.url).origin).replace(/\/$/, "");
+    const { error: otpError } = await client.auth.signInWithOtp({
+      email: data.email,
+      options: { shouldCreateUser: true, emailRedirectTo: `${origin}/portal` },
+    });
+    if (otpError) console.error("[signup] code send failed", otpError.message);
+    return { ok: true as const };
+  });
+
 /** Plan definitions are public (RLS allows anyone to read them); owners see what each plan offers. */
 export const listPlanCatalog = createServerFn({ method: "GET" }).handler(async () =>
   readPlanCatalog(publicClient()),

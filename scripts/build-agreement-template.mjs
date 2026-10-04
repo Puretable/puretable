@@ -17,10 +17,8 @@ if (messages.length) console.warn("mammoth messages:", messages);
 
 // Sanity checks: the known blank-fill anchors must still be present, unmodified by hand.
 const required = [
-  "Second: (_____), Commercial Registration No.: (_____), Tax Number: (_____), Address: (_____), Email: (_____), represented by/in the capacity of: (_____).",
-  "ثانياً: ()، السجل التجاري: () الرقم الضريبي: () العنوان: () البريد الإلكتروني: () ويمثلها/ بصفته ().",
-  "On this day corresponding to ___ /___ /___ H, an agreement was concluded between:",
-  "إنه في يوم الموافق / /هـ تم الاتفاق بين كل من:",
+  "Second: (_____), Commercial Registration No.: (_____), Tax Number: (_____), Address: (_____), Email: (_____).",
+  "ثانياً: ()، السجل التجاري: () الرقم الضريبي: () العنوان: () البريد الإلكتروني: ().",
 ];
 for (const marker of required) {
   if (!html.includes(marker))

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLAN_FEATURES, PLAN_TIERS, type PlanTier } from "./plans";
+import { PLAN_TIERS, type PlanTier } from "./plans";
 
 /**
  * Business Owner Portal — shared types and pure helpers.
@@ -50,12 +50,15 @@ export type OwnerBusiness = {
   plan: PlanTier;
   cover_url: string | null;
   business_info_completed: boolean;
+  terms_accepted_at: string | null;
   entitlements: {
     branch_limit: number | null;
     photo_limit: number;
     description_limit: number | null;
     show_links: boolean;
     analytics: "none" | "basic" | "full";
+    featured: boolean;
+    menu: boolean;
   };
   usage: {
     branches_published: number;
@@ -225,25 +228,27 @@ export function ownerFeatures(b: OwnerBusiness): OwnerFeature[] {
     {
       key: "featured",
       label: "الظهور المميز",
-      available: PLAN_FEATURES[b.plan].featured,
-      detail: PLAN_FEATURES[b.plan].featured ? "ضمن الأعمال المميزة" : "متاح في Premium",
-      unlockedBy: PLAN_FEATURES[b.plan].featured ? undefined : "premium",
+      available: e.featured,
+      detail: e.featured ? "ضمن الأعمال المميزة" : "متاح في Premium",
+      unlockedBy: e.featured ? undefined : "premium",
     },
   ];
 }
 
 const MESSAGES: [pattern: RegExp, message: string][] = [
   [/already on this plan/i, "عملك على هذه الباقة بالفعل."],
+  [/billing info must be completed/i, "أكمل بيانات الفوترة أولاً قبل الاشتراك في باقة مدفوعة."],
   [/forbidden|permission denied|42501/i, "لا تملك صلاحية تنفيذ هذا الإجراء."],
   [/does not include analytics/i, "التحليلات غير متاحة في باقتك الحالية."],
   [/only pending requests/i, "هذا الطلب لم يعد بانتظار المراجعة."],
   [/end date must be in the future/i, "يجب أن يكون تاريخ الانتهاء في المستقبل."],
   [/duplicate key|unique constraint|23505/i, "هذا السجل موجود مسبقاً."],
   [/access suspended/i, "تم تعليق وصولك من قبل الإدارة. تواصل معنا لإعادة التفعيل."],
-  [/branch limit reached/i, "وصلت إلى الحد الأقصى للفروع في باقتك. أخفِ فرعاً أو ارفع الباقة."],
-  [/photo limit reached/i, "وصلت إلى الحد الأقصى للصور في باقتك."],
+  [/branch limit reached/i, "وصلت إلى الحد الأقصى المسموح به للفروع حالياً. أخفِ فرعاً للمتابعة."],
+  [/photo limit reached/i, "وصلت إلى الحد الأقصى المسموح به للصور حالياً."],
   [/photo must be uploaded/i, "ارفع الصور من خلال البوابة."],
   [/all fields are required/i, "جميع الحقول مطلوبة لإكمال بيانات الفوترة."],
+  [/trade name and cr number are required/i, "أدخل الاسم التجاري ورقم السجل التجاري."],
   [
     /require a pro or premium/i,
     "إضافة أصناف القائمة الخالية من الجلوتين متاحة في باقتي Pro وPremium.",

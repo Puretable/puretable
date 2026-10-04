@@ -8,6 +8,7 @@
  * "Near me" is location based, so it has no tag.
  */
 import { CalendarCheck, Bike, ShoppingBag, type LucideIcon } from "lucide-react";
+import { featuresOf, type PlanAccess } from "@/lib/plans";
 
 export type ServiceDef = {
   value: string;
@@ -41,11 +42,11 @@ export function serviceBySlug(slug: string) {
 }
 
 /**
- * "Featured places" is automatic: a business appears there while its manually
- * set plan is Premium. Nothing to tick in the editor.
+ * "Featured places" is automatic: a business appears there while its effective
+ * plan (after any platform-wide override) is Premium. Nothing to tick in the editor.
  */
-export function isFeatured(b: { plan?: string | null }) {
-  return (b.plan ?? "free") === "premium";
+export function isFeatured(b: PlanAccess) {
+  return featuresOf(b).featured;
 }
 
 /** Controlled by the admin toggle, regardless of the eventual booking method. */

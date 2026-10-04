@@ -117,6 +117,12 @@ export function OwnerLogin() {
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             إرسال رمز التحقق
           </button>
+          <p className="text-center text-xs text-muted-foreground">
+            ليس لديك عمل مسجّل؟{" "}
+            <a href="/signup" className="text-primary underline">
+              أنشئ حسابك
+            </a>
+          </p>
         </form>
       ) : (
         <form

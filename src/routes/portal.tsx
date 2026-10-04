@@ -13,17 +13,20 @@ import {
   Lock,
   Check,
   MapPin,
+  ShieldCheck,
   Store,
   Utensils,
 } from "lucide-react";
 import { Page } from "@/components/site/Layout";
-import { BusinessInfoGate } from "@/components/portal/BusinessInfoGate";
+import { AgreementGate } from "@/components/portal/AgreementGate";
+import { BillingInfoPanel } from "@/components/portal/BillingInfoPanel";
 import { OwnerLogin } from "@/components/portal/OwnerLogin";
 import { OwnerAnalytics } from "@/components/portal/OwnerAnalytics";
 import { PlanPicker } from "@/components/portal/PlanPicker";
 import { OwnerWorkspace, type ManageTab } from "@/components/portal/OwnerWorkspace";
 import { SubscriptionHistory } from "@/components/portal/SubscriptionHistory";
 import { supabase } from "@/integrations/supabase/client";
+import { useSiteText } from "@/hooks/use-site-settings";
 import { getOwnerHistory, getOwnerOverview, listPlanCatalog } from "@/lib/owner-portal.functions";
 import {
   STATUS_LABELS,
@@ -45,9 +48,7 @@ export const Route = createFileRoute("/portal")({
 });
 
 type AuthState =
-  | { state: "loading" }
-  | { state: "out" }
-  | { state: "in"; userId: string; email: string };
+  { state: "loading" } | { state: "out" } | { state: "in"; userId: string; email: string };
 
 function PortalPage() {
   const [auth, setAuth] = useState<AuthState>({ state: "loading" });
@@ -77,11 +78,13 @@ function PortalPage() {
   );
 }
 
-type Tab = "overview" | ManageTab | "plans" | "history";
+type Tab = "overview" | ManageTab | "billing" | "plans" | "history";
 const MANAGE_TABS: readonly Tab[] = ["info", "branches", "photos", "links", "menu"];
 
 function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
   const qc = useQueryClient();
+  const { settings } = useSiteText();
+  const packagesEnabled = settings.sections["packages_enabled"] === true;
   const loadOverview = useServerFn(getOwnerOverview);
   const loadCatalog = useServerFn(listPlanCatalog);
   const [selectedId, setSelectedId] = useState("");
@@ -169,14 +172,27 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
       </section>
     );
 
-  if (!business.business_info_completed)
+  if (!business.terms_accepted_at)
     return (
       <section dir="rtl" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         {header}
         <div className="mt-8">
-          <BusinessInfoGate
+          <AgreementGate business={business} onDone={() => void overview.refetch()} />
+        </div>
+      </section>
+    );
+
+  // While packages are platform-disabled, the (now minimal) billing-info form is a hard gate before
+  // the dashboard, not just something that unlocks paid-plan selection — see BillingInfoPanel.
+  if (!packagesEnabled && !business.business_info_completed)
+    return (
+      <section dir="rtl" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        {header}
+        <div className="mt-8 rounded-3xl border bg-card p-6 sm:p-8">
+          <BillingInfoPanel
             business={business}
             accountEmail={email}
+            packagesEnabled={false}
             onDone={() => void overview.refetch()}
           />
         </div>
@@ -218,8 +234,13 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
               { id: "photos", label: "الصور", icon: ImageIcon },
               { id: "links", label: "روابط الطلب", icon: Link2 },
               { id: "menu", label: "قائمة الطعام", icon: Utensils },
-              { id: "plans", label: "الباقات", icon: Crown },
-              { id: "history", label: "سجل الاشتراكات", icon: History },
+              { id: "billing", label: "بيانات الفوترة", icon: ShieldCheck },
+              ...(packagesEnabled
+                ? ([
+                    { id: "plans", label: "الباقات", icon: Crown },
+                    { id: "history", label: "سجل الاشتراكات", icon: History },
+                  ] as const)
+                : []),
             ] as const
           ).map((item) => (
             <button
@@ -235,18 +256,31 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
         </nav>
         <div className="min-w-0 rounded-2xl border bg-card p-5 sm:p-8">
           {tab === "overview" && (
-            <Overview business={business} onChoosePlan={() => setTab("plans")} />
+            <Overview
+              business={business}
+              packagesEnabled={packagesEnabled}
+              onChoosePlan={() => setTab("plans")}
+              onGoBilling={() => setTab("billing")}
+            />
           )}
           {MANAGE_TABS.includes(tab) && (
             <OwnerWorkspace key={business.id} overview={business} tab={tab as ManageTab} />
           )}
-          {tab === "plans" &&
+          {tab === "billing" && (
+            <BillingInfoPanel
+              business={business}
+              accountEmail={email}
+              packagesEnabled={packagesEnabled}
+            />
+          )}
+          {packagesEnabled &&
+            tab === "plans" &&
             (business.access_suspended ? (
               <SuspendedNotice business={business} />
             ) : (
               <PlanPicker business={business} catalog={catalog.data} />
             ))}
-          {tab === "history" && <History_ business={business} />}
+          {packagesEnabled && tab === "history" && <History_ business={business} />}
         </div>
       </div>
     </section>
@@ -255,66 +289,89 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
 
 function Overview({
   business,
+  packagesEnabled,
   onChoosePlan,
+  onGoBilling,
 }: {
   business: OwnerBusiness;
+  packagesEnabled: boolean;
   onChoosePlan: () => void;
+  onGoBilling: () => void;
 }) {
   const current = business.current;
   const left = daysRemaining(current?.ends_at ?? null);
   const previous = Math.max(0, business.activated_count - (current?.starts_at ? 1 : 0));
   return (
     <div className="space-y-8">
-      <section aria-labelledby="current-plan" className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="current-plan" className="text-xl font-semibold">
-            اشتراكك الحالي
-          </h2>
-          <button
-            type="button"
-            onClick={onChoosePlan}
-            className="min-h-11 rounded-full bg-primary px-5 text-sm text-primary-foreground"
-          >
-            تغيير الباقة
-          </button>
-        </div>
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Info label="الباقة" value={PLAN_LABELS[current?.plan ?? business.plan]} />
-          <Info label="الحالة" value={current ? STATUS_LABELS[current.status] : "—"} />
-          <Info label="تاريخ التفعيل" value={formatDate(current?.starts_at)} />
-          <Info
-            label="تاريخ الانتهاء"
-            value={current?.ends_at ? formatDate(current.ends_at) : "بدون انتهاء"}
-            hint={left === null ? undefined : `متبقي ${left} يوم`}
-            warn={isExpiringSoon(current?.ends_at ?? null)}
-          />
-          <Info label="اشتراكات سابقة" value={String(previous)} />
-          <Info
-            label="إجمالي الباقات المفعّلة"
-            value={String(business.activated_count)}
-            hint="تشمل الحالية"
-          />
-        </dl>
-        {business.access_suspended && <SuspendedNotice business={business} />}
-        {business.pending && (
-          <p
-            role="status"
-            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-soft p-4 text-sm"
-          >
-            <CalendarClock className="h-4 w-4 shrink-0" />
-            طلب الباقة {PLAN_LABELS[business.pending.plan]} بانتظار تفعيل الإدارة منذ{" "}
-            {formatDate(business.pending.requested_at)}.
-          </p>
-        )}
-        {!business.published && (
-          <p className="rounded-xl border p-4 text-sm text-muted-foreground">
-            صفحة عملك غير منشورة حالياً، لذلك لا تظهر للزوار.
-          </p>
-        )}
-      </section>
+      {packagesEnabled && (
+        <section aria-labelledby="current-plan" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="current-plan" className="text-xl font-semibold">
+              اشتراكك الحالي
+            </h2>
+            <button
+              type="button"
+              onClick={onChoosePlan}
+              className="min-h-11 rounded-full bg-primary px-5 text-sm text-primary-foreground"
+            >
+              تغيير الباقة
+            </button>
+          </div>
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="الباقة" value={PLAN_LABELS[current?.plan ?? business.plan]} />
+            <Info label="الحالة" value={current ? STATUS_LABELS[current.status] : "—"} />
+            <Info label="تاريخ التفعيل" value={formatDate(current?.starts_at)} />
+            <Info
+              label="تاريخ الانتهاء"
+              value={current?.ends_at ? formatDate(current.ends_at) : "بدون انتهاء"}
+              hint={left === null ? undefined : `متبقي ${left} يوم`}
+              warn={isExpiringSoon(current?.ends_at ?? null)}
+            />
+            <Info label="اشتراكات سابقة" value={String(previous)} />
+            <Info
+              label="إجمالي الباقات المفعّلة"
+              value={String(business.activated_count)}
+              hint="تشمل الحالية"
+            />
+          </dl>
+          {business.access_suspended && <SuspendedNotice business={business} />}
+          {business.pending && (
+            <p
+              role="status"
+              className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-soft p-4 text-sm"
+            >
+              <CalendarClock className="h-4 w-4 shrink-0" />
+              طلب الباقة {PLAN_LABELS[business.pending.plan]} بانتظار تفعيل الإدارة منذ{" "}
+              {formatDate(business.pending.requested_at)}.
+            </p>
+          )}
+          {!business.published && (
+            <p className="rounded-xl border p-4 text-sm text-muted-foreground">
+              صفحة عملك غير منشورة حالياً، لذلك لا تظهر للزوار.
+            </p>
+          )}
+          {!business.business_info_completed && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed p-4 text-sm">
+              <span>أكمل بيانات الفوترة لتتمكن من الاشتراك في باقة Pro أو Premium.</span>
+              <button
+                type="button"
+                onClick={onGoBilling}
+                className="min-h-9 rounded-full border bg-background px-4 text-xs"
+              >
+                إكمال البيانات
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+      {!packagesEnabled && !business.published && (
+        <p className="rounded-xl border p-4 text-sm text-muted-foreground">
+          صفحة عملك غير منشورة حالياً، لذلك لا تظهر للزوار.
+        </p>
+      )}
       <section aria-labelledby="features" className="space-y-4">
         <h2 id="features" className="text-xl font-semibold">
-          مميزات باقتك
+          مميزات صفحتك
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2">
           {ownerFeatures(business).map((feature) => (
@@ -336,8 +393,8 @@ function Overview({
         </ul>
         {business.usage.branches_hidden_by_plan > 0 && (
           <p className="rounded-xl border p-4 text-sm">
-            {business.usage.branches_hidden_by_plan} فرع مخفي بسبب حدود باقتك الحالية. تعود للظهور
-            عند الترقية.
+            {business.usage.branches_hidden_by_plan} فرع مخفي بسبب الحد الأقصى الحالي لعدد الفروع
+            الظاهرة. تعود للظهور تلقائياً عند رفع الحد.
           </p>
         )}
       </section>

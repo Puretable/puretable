@@ -77,7 +77,7 @@ export function PhotosManager({
       for (const file of picked) urls.push(await upload(file));
       setGallery((g) => [...g, ...urls]);
       if (picked.length < files.length)
-        setError("وصلت إلى الحد الأقصى للصور في باقتك، أُضيف ما يتسع له فقط.");
+        setError("وصلت إلى الحد الأقصى المسموح به للصور حالياً، أُضيف ما يتسع له فقط.");
     } catch (e) {
       setError(friendlyPortalError(e));
     } finally {
@@ -106,8 +106,8 @@ export function PhotosManager({
           الصور
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          استخدمت {used} من {limit} صور في باقتك (الغلاف والألبوم معاً). JPG أو PNG أو WebP، حتى 10
-          ميجابايت للصورة.
+          استخدمت {used} من {limit} صور متاحة لصفحتك (الغلاف والألبوم معاً). JPG أو PNG أو WebP، حتى
+          10 ميجابايت للصورة.
         </p>
       </div>
 
@@ -190,7 +190,7 @@ export function PhotosManager({
             />
           ) : (
             <p className="text-xs text-muted-foreground">
-              وصلت إلى حد الصور في باقتك. رقِّ الباقة لإضافة المزيد.
+              وصلت إلى الحد الأقصى المسموح به للصور حالياً.
             </p>
           ))}
       </div>

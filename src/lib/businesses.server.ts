@@ -1,6 +1,7 @@
 import { readPlanCatalog } from "./subscriptions.server";
 import { toFeatures } from "./subscriptions";
 import { canUseMenu, planOf } from "./plans";
+import { isPackagesEnabled } from "./packages-enabled.server";
 import type { MenuItem } from "./owner-manage.schemas";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -89,11 +90,13 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
     { data: links, error: linksError },
     { data: branches, error: branchesError },
     catalog,
+    packagesEnabled,
   ] = await Promise.all([
     client.from("businesses").select("*").order("created_at", { ascending: true }),
     client.from("business_links").select("*"),
     client.from("business_branches").select("*").eq("published", true),
     readPlanCatalog(client),
+    isPackagesEnabled(client),
   ]);
   if (businessesError) throw new Error(businessesError.message);
   if (linksError) throw new Error(linksError.message);
@@ -121,7 +124,7 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
       byBusiness.get(row.id) ?? [],
       branchesByBusiness.get(row.id) ?? [],
     ),
-    entitlements: toFeatures(catalog[planOf(row)]),
+    entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
   }));
 }
 
@@ -134,15 +137,20 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!row) return null;
-  const [{ data: links, error: linksError }, { data: branches, error: branchesError }, catalog] =
-    await Promise.all([
-      client.from("business_links").select("*").eq("business_id", row.id),
-      client.from("business_branches").select("*").eq("business_id", row.id).eq("published", true),
-      readPlanCatalog(client),
-    ]);
+  const [
+    { data: links, error: linksError },
+    { data: branches, error: branchesError },
+    catalog,
+    packagesEnabled,
+  ] = await Promise.all([
+    client.from("business_links").select("*").eq("business_id", row.id),
+    client.from("business_branches").select("*").eq("business_id", row.id).eq("published", true),
+    readPlanCatalog(client),
+    isPackagesEnabled(client),
+  ]);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
-  const menu = canUseMenu(row) ? await fetchPublicMenu(client, row.id) : [];
+  const menu = packagesEnabled && !canUseMenu(row) ? [] : await fetchPublicMenu(client, row.id);
   const mappedLinks = (links ?? []).map(mapLink);
   const business = mapDbBusiness(
     row as never,
@@ -154,7 +162,11 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
       ),
     ),
   );
-  return { ...business, menu, entitlements: toFeatures(catalog[planOf(row)]) };
+  return {
+    ...business,
+    menu,
+    entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
+  };
 }
 
 /**

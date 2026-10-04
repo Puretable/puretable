@@ -11,6 +11,7 @@ import {
   deleteMenuItem,
   deleteOwnerBranch,
   deleteOwnerLink,
+  saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
   saveOwnerLink,
@@ -20,6 +21,7 @@ import {
   type Actor,
 } from "../src/lib/owner-manage.server";
 import {
+  BillingFieldsInput,
   MenuItemInput,
   OwnerBranchInput,
   OwnerBusinessInput,
@@ -123,11 +125,25 @@ const validInfo = (over: Record<string, unknown> = {}) => ({
 });
 const parseInfo = (o: Record<string, unknown>) => OwnerBusinessInput.parse(o);
 const parseMenu = (o: Record<string, unknown>) => MenuItemInput.parse(o);
+const parseBilling = (o: Record<string, unknown>) => BillingFieldsInput.parse(o);
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
 );
+
+const originalSections = ok(
+  await service.from("site_settings").select("sections").eq("id", "default").single(),
+).sections as Record<string, boolean> | null;
+
+// Everything below except the dedicated "Premium-for-everyone override" section exercises real
+// Free/Pro/Premium tier differences, exactly as already verified — packages_enabled defaults to
+// false/absent (the new default), which would otherwise apply the Premium-for-everyone override
+// throughout and mask those checks. Restored to the true original state in `finally`.
+await service
+  .from("site_settings")
+  .update({ sections: { ...originalSections, packages_enabled: true } })
+  .eq("id", "default");
 
 try {
   console.log("Setup");
@@ -966,137 +982,81 @@ try {
     "the owner can edit again after reactivation; suspend/reactivate are recorded in the audit log",
   );
 
-  console.log("Business billing info (post-payment step)");
-  // The first-ever PAID activation requires the post-payment step; a plain approval (payment not
-  // required, as used above) never does.
-  ok(
-    await owner.client.rpc("request_business_plan", {
-      _business_id: A,
-      _plan: "premium",
-      _period_months: 1,
-    }),
-  );
-  const pendingBilling = ok(
-    await service
-      .from("business_subscriptions")
-      .select("id")
-      .eq("business_id", A)
-      .eq("status", "pending")
-      .single(),
-  );
-  ok(
-    await staff.client.rpc("admin_activate_subscription", {
-      _id: pendingBilling.id,
-      _payment_status: "paid",
-    }),
-  );
-  assert.equal(
-    ok(await service.from("businesses").select("business_info_completed").eq("id", A).single())
-      .business_info_completed,
-    false,
-    "first paid activation requires the post-payment step",
-  );
-  const hiddenFromPublic = await anonClient()
-    .from("businesses")
-    .select("id")
-    .eq("id", A)
-    .maybeSingle();
-  assert.equal(
-    hiddenFromPublic.data,
-    null,
-    "a published business stays invisible to the public until the step is completed",
-  );
-  step("the first paid plan activation hides the business from the public and requires the step");
-
+  console.log("Self-service signup, agreement, and the minimal billing-info gate");
   await rejects(
     (async () =>
       ok(
-        await owner.client.rpc("save_business_billing_fields", {
-          _business_id: A,
-          _trade_name: "",
-          _cr_number: "CR-1",
-          _tax_number: null,
-          _address: "Riyadh",
-          _email: "owner@example.com",
-          _phone: "0500000000",
-          _representative_name: "Owner Name",
-          _representative_title: "Owner",
+        await anonClient().rpc("signup_create_business", {
+          _business_name: "",
+          _email: `qa-signup-${tag}@example.com`,
         }),
       ))(),
-    /All fields are required/,
-    "submitting with a blank required field",
+    /Business name must be between/,
+    "signup with a blank business name",
   );
   await rejects(
     (async () =>
       ok(
-        await stranger.client.rpc("save_business_billing_fields", {
-          _business_id: A,
-          _trade_name: "x",
-          _cr_number: "x",
-          _tax_number: null,
-          _address: "x",
-          _email: "x@example.com",
-          _phone: "x",
-          _representative_name: "x",
-          _representative_title: "x",
+        await anonClient().rpc("signup_create_business", {
+          _business_name: "QA Signup Biz",
+          _email: "not-an-email",
         }),
       ))(),
-    /Forbidden/,
-    "a stranger cannot submit another business's billing info",
+    /A valid email is required/,
+    "signup with an invalid email",
   );
-  // Phase 2 refuses before phase 1 (saving billing fields) has happened.
-  await rejects(
-    (async () =>
-      ok(
-        await owner.client.rpc("accept_partnership_agreement", {
-          _business_id: A,
-          _terms_version: "v1",
-        }),
-      ))(),
-    /Billing fields have not been saved yet/,
-    "accepting before billing fields are saved",
-  );
-  ok(
-    await owner.client.rpc("save_business_billing_fields", {
-      _business_id: A,
-      _trade_name: "QA Trading Est.",
-      _cr_number: "CR-12345",
-      _tax_number: null,
-      _address: "King Fahd Rd, Riyadh",
-      _email: "owner@example.com",
-      _phone: "0500000000",
-      _representative_name: "QA Owner",
-      _representative_title: "Owner",
+  const signupEmail = `qa-signup-${tag}@example.com`;
+  const newBusinessId = ok(
+    await anonClient().rpc("signup_create_business", {
+      _business_name: "QA Signup Biz",
+      _email: signupEmail,
     }),
-  );
-  const savedFields = ok(
+  ) as string;
+  created.businesses.push(newBusinessId);
+  const signedUp = ok(
     await service
       .from("businesses")
-      .select(
-        "business_info_completed, invoice_trade_name, invoice_cr_number, invoice_tax_number, invoice_address, invoice_email, invoice_phone, invoice_representative_name, invoice_representative_title, terms_accepted_at",
-      )
-      .eq("id", A)
+      .select("published, plan, business_info_completed, terms_accepted_at")
+      .eq("id", newBusinessId)
       .single(),
   );
+  assert.equal(signedUp.published, false, "a self-signup business starts unpublished");
+  assert.equal(signedUp.plan, "free", "a self-signup business starts on the Free plan");
   assert.equal(
-    savedFields.business_info_completed,
+    signedUp.business_info_completed,
     false,
-    "saving fields alone does not complete the step",
+    "a self-signup business starts needing the billing-info gate (not the default true)",
   );
-  assert.equal(savedFields.invoice_trade_name, "QA Trading Est.");
-  assert.equal(savedFields.invoice_cr_number, "CR-12345");
-  assert.equal(savedFields.invoice_tax_number, null, "an empty tax number is stored as null");
-  assert.equal(savedFields.invoice_representative_name, "QA Owner");
-  assert.equal(savedFields.terms_accepted_at, null);
-  step(
-    "phase 1: an owner saves billing fields; an empty tax number stays null; the step stays incomplete",
+  assert.equal(signedUp.terms_accepted_at, null);
+  step("open self-signup creates an unpublished Free business and starts both gates incomplete");
+
+  // Log the new owner in the same way the real OTP flow would, without needing real email delivery.
+  const { user: signupUser } = ok(
+    await service.auth.admin.createUser({
+      email: signupEmail,
+      password: randomUUID() + "aA1!",
+      email_confirm: true,
+    }),
+  );
+  if (!signupUser) throw new Error("signup user not created");
+  created.users.push(signupUser.id);
+  const signupLink = ok(
+    await service.auth.admin.generateLink({ type: "magiclink", email: signupEmail }),
+  );
+  const signupClient = anonClient();
+  ok(
+    await signupClient.auth.verifyOtp({
+      email: signupEmail,
+      token: signupLink.properties.email_otp,
+      type: "email",
+    }),
   );
 
   await rejects(
     (async () =>
       ok(
         await stranger.client.rpc("accept_partnership_agreement", {
-          _business_id: A,
+          _business_id: newBusinessId,
           _terms_version: "v1",
         }),
       ))(),
@@ -1104,36 +1064,178 @@ try {
     "a stranger cannot accept another business's agreement",
   );
   ok(
-    await owner.client.rpc("accept_partnership_agreement", {
-      _business_id: A,
+    await signupClient.rpc("accept_partnership_agreement", {
+      _business_id: newBusinessId,
       _terms_version: "v1",
     }),
   );
-  const completed = ok(
+  assert.ok(
+    ok(
+      await service.from("businesses").select("terms_accepted_at").eq("id", newBusinessId).single(),
+    ).terms_accepted_at,
+    "accepting the agreement does not require any billing field to exist first",
+  );
+  step("the agreement can be accepted immediately after signup, before any billing field is saved");
+
+  await rejects(
+    (async () =>
+      ok(
+        await signupClient.rpc("request_business_plan", {
+          _business_id: newBusinessId,
+          _plan: "pro",
+          _period_months: 1,
+        }),
+      ))(),
+    /Billing info must be completed/,
+    "requesting a paid plan before the billing-info step is complete",
+  );
+  step("a paid plan cannot be requested until the billing-info step is complete");
+
+  await rejects(
+    (async () =>
+      ok(
+        await signupClient.rpc("save_business_billing_fields", {
+          _business_id: newBusinessId,
+          _trade_name: "",
+          _cr_number: "CR-1",
+        }),
+      ))(),
+    /Trade name and CR number are required/,
+    "saving with a blank trade name",
+  );
+  // Through the real app-layer function (zod validation + RPC together), not a raw RPC call —
+  // this is exactly what BillingInfoPanel sends while packages are disabled (the other fields
+  // explicitly null), and is what actually caught the zod-schema/RPC mismatch bug during manual
+  // testing: the schema had not been relaxed to match the database function's relaxed requirements.
+  const { business_id: _billingBusinessId, ...billingFields } = parseBilling({
+    business_id: newBusinessId,
+    trade_name: "QA Signup Biz",
+    cr_number: "CR-999",
+    tax_number: null,
+    address: null,
+    email: null,
+    phone: null,
+    representative_name: null,
+    representative_title: null,
+  });
+  ok(
+    await saveBusinessBillingFields(
+      actorFor({ id: signupUser.id, client: signupClient }),
+      newBusinessId,
+      billingFields,
+    ),
+  );
+  const minimalSaved = ok(
     await service
       .from("businesses")
-      .select("business_info_completed, terms_accepted_at, terms_version")
-      .eq("id", A)
+      .select(
+        "business_info_completed, invoice_trade_name, invoice_cr_number, invoice_address, invoice_phone",
+      )
+      .eq("id", newBusinessId)
       .single(),
   );
-  assert.equal(completed.business_info_completed, true);
-  assert.equal(completed.terms_version, "v1");
-  assert.ok(completed.terms_accepted_at, "terms acceptance is timestamped");
-  const visibleAgain = await anonClient().from("businesses").select("id").eq("id", A).maybeSingle();
-  assert.ok(visibleAgain.data, "the business is visible to the public again once completed");
+  assert.equal(
+    minimalSaved.business_info_completed,
+    true,
+    "trade name + CR number alone complete the step — the other fields stay optional",
+  );
+  assert.equal(minimalSaved.invoice_trade_name, "QA Signup Biz");
+  assert.equal(minimalSaved.invoice_cr_number, "CR-999");
+  assert.equal(minimalSaved.invoice_address, null, "the deferred fields are never required");
+  step("saving just trade name + CR number completes the billing-info gate on its own");
+
+  console.log("Premium-for-everyone override while packages are platform-disabled");
+  ok(
+    await service
+      .from("site_settings")
+      .update({ sections: { ...originalSections, packages_enabled: false } })
+      .eq("id", "default"),
+  );
+  const overviewDisabled = ok(await signupClient.rpc("owner_portal_overview")) as Array<{
+    id: string;
+    plan: string;
+    entitlements: { branch_limit: number | null; photo_limit: number; analytics: string };
+  }>;
+  const freeRowOverridden = overviewDisabled.find((b) => b.id === newBusinessId)!;
+  assert.equal(freeRowOverridden.plan, "free", "the stored plan is never changed by the override");
+  assert.equal(
+    freeRowOverridden.entitlements.photo_limit,
+    15,
+    "entitlements show Premium's limits",
+  );
+  assert.equal(
+    freeRowOverridden.entitlements.branch_limit,
+    null,
+    "Premium's branch limit is unlimited",
+  );
+  assert.equal(freeRowOverridden.entitlements.analytics, "full");
+  ok(
+    await saveMenuItem(
+      actorFor({ id: signupUser.id, client: signupClient }),
+      parseMenu({ business_id: newBusinessId, name: "Override item", price: 1, safety: "green" }),
+    ),
+  );
   step(
-    "phase 2: accepting the generated agreement completes the step; the business becomes visible again",
+    "while packages are disabled, a nominally-Free business gets Premium entitlements and can use the menu",
   );
 
-  // A later routine upgrade never re-asks: info is already on file.
   ok(
-    await owner.client.rpc("request_business_plan", {
-      _business_id: A,
+    await service
+      .from("site_settings")
+      .update({ sections: { ...originalSections, packages_enabled: true } })
+      .eq("id", "default"),
+  );
+  const overviewEnabled = ok(await signupClient.rpc("owner_portal_overview")) as Array<{
+    id: string;
+    entitlements: { photo_limit: number };
+  }>;
+  assert.equal(
+    overviewEnabled.find((b) => b.id === newBusinessId)!.entitlements.photo_limit,
+    1,
+    "re-enabling packages restores the business's real (Free) entitlements",
+  );
+  await rejects(
+    deleteMenuItem(
+      actorFor({ id: signupUser.id, client: signupClient }),
+      newBusinessId,
+      "00000000-0000-0000-0000-000000000000",
+    ),
+    /Pro or Premium/,
+    "re-enabling packages restores the real Free-plan menu restriction",
+  );
+  step("re-enabling packages resumes real Free/Pro/Premium differences exactly as before");
+
+  ok(
+    await signupClient.rpc("request_business_plan", {
+      _business_id: newBusinessId,
       _plan: "pro",
       _period_months: 1,
     }),
   );
-  const pendingSecond = ok(
+  assert.equal(
+    ok(
+      await service
+        .from("business_subscriptions")
+        .select("status")
+        .eq("business_id", newBusinessId)
+        .eq("status", "pending")
+        .single(),
+    ).status,
+    "pending",
+    "now that billing info is on file, requesting a paid plan succeeds",
+  );
+  step("requesting a paid plan succeeds once the billing-info step is complete");
+
+  // A later PAID admin activation no longer touches business_info_completed at all (that trigger
+  // was specific to the old design and has been fully reverted).
+  ok(
+    await owner.client.rpc("request_business_plan", {
+      _business_id: A,
+      _plan: "premium",
+      _period_months: 1,
+    }),
+  );
+  const pendingRevert = ok(
     await service
       .from("business_subscriptions")
       .select("id")
@@ -1141,19 +1243,24 @@ try {
       .eq("status", "pending")
       .single(),
   );
+  const infoBefore = ok(
+    await service.from("businesses").select("business_info_completed").eq("id", A).single(),
+  ).business_info_completed;
   ok(
     await staff.client.rpc("admin_activate_subscription", {
-      _id: pendingSecond.id,
+      _id: pendingRevert.id,
       _payment_status: "paid",
     }),
   );
   assert.equal(
     ok(await service.from("businesses").select("business_info_completed").eq("id", A).single())
       .business_info_completed,
-    true,
-    "a later paid upgrade does not re-gate a business that already has info on file",
+    infoBefore,
+    "a paid activation no longer changes business_info_completed — that trigger was reverted",
   );
-  step("a routine later upgrade never re-asks for the already-completed step");
+  step(
+    "admin-approved paid activation no longer gates visibility (fully reverted to the old behaviour)",
+  );
 
   const billingRows = ok(await staff.client.rpc("admin_list_business_billing")) as Array<{
     id: string;
@@ -1163,8 +1270,10 @@ try {
   const billingRow = billingRows.find((r) => r.id === A);
   assert.ok(billingRow, "the business appears in the admin billing list");
   assert.equal(billingRow!.invoice_status, "not_sent");
+  // Business A itself never went through accept_partnership_agreement in this script (that's
+  // exercised on newBusinessId above) — check the timestamp on that row instead.
   assert.ok(
-    billingRow!.terms_accepted_at,
+    billingRows.find((r) => r.id === newBusinessId)?.terms_accepted_at,
     "the admin list shows the agreement acceptance timestamp",
   );
   await rejects(
@@ -1185,6 +1294,7 @@ try {
 
   console.log(`\nAll ${checks} checks passed.`);
 } finally {
+  await service.from("site_settings").update({ sections: originalSections }).eq("id", "default");
   if (created.objects.length) await service.storage.from("business-covers").remove(created.objects);
   if (created.businesses.length) {
     for (const id of created.businesses) {

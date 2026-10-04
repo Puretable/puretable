@@ -164,8 +164,7 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
             قائمة الطعام الخالية من الجلوتين
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            تظهر أصنافك لزوار صفحتك (ميزة باقتي Pro وPremium). أنت المسؤول عن دقة الاسم والسعر
-            ومستوى الأمان.
+            تظهر أصنافك لزوار صفحتك. أنت المسؤول عن دقة الاسم والسعر ومستوى الأمان.
           </p>
         </div>
         {!disabled && !draft && (

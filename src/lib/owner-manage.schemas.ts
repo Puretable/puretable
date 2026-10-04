@@ -200,22 +200,36 @@ export const OwnerLinkInput = LinkInput.extend({
 export type OwnerLinkInput = z.infer<typeof OwnerLinkInput>;
 
 /**
- * The required post-payment step, in two phases:
- *  1. BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative.
- *     Saving this also generates the filled Partnership Agreement PDF.
- *  2. AcceptAgreementInput — accepting the PDF just generated, which actually completes the step.
+ * Two independent steps, not phases of one flow:
+ *  - AcceptAgreementInput — accepting the Partnership Agreement on first login. Gates the dashboard.
+ *  - BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative. Gates
+ *    selecting a paid package (and, while packages are platform-disabled, the dashboard too).
  */
 export const AGREEMENT_TERMS_VERSION = "v1";
+// Only trade name + CR number are hard-required for now (packages/full invoicing details are
+// platform-disabled — see the `packages_enabled` toggle); the rest stay optional here to match the
+// relaxed `save_business_billing_fields` database function, so the full form works unchanged the
+// moment packages are re-enabled.
 export const BillingFieldsInput = z.object({
   business_id: z.string().uuid(),
   trade_name: req(200),
   cr_number: req(50),
   tax_number: opt(50),
-  address: req(300),
-  email: z.string().trim().toLowerCase().max(320).pipe(z.email("أدخل بريداً إلكترونياً صحيحاً.")),
-  phone: req(40),
-  representative_name: req(200),
-  representative_title: req(100),
+  address: opt(300),
+  email: z.preprocess(
+    emptyToNull,
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(320)
+      .pipe(z.email("أدخل بريداً إلكترونياً صحيحاً."))
+      .nullable()
+      .optional(),
+  ),
+  phone: opt(40),
+  representative_name: opt(200),
+  representative_title: opt(100),
 });
 export type BillingFieldsInput = z.infer<typeof BillingFieldsInput>;
 

@@ -247,6 +247,7 @@ const PRELAUNCH_OPEN = [
   "/admin-login",
   "/profile",
   "/portal",
+  "/signup",
   "/favorites",
   "/reset-password",
   "/privacy",

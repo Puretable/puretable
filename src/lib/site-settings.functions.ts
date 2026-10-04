@@ -105,3 +105,33 @@ export const setSiteLive = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { sections };
   });
+
+/**
+ * Packages/payments are temporarily disabled platform-wide: hidden from the owner portal, every
+ * business gets full Premium entitlements for free, and the post-agreement business-info form only
+ * asks for trade name + CR number. Re-enabling restores all of this exactly as already built — the
+ * underlying package/subscription data and code are untouched either way.
+ */
+export const setPackagesEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => z.object({ enabled: z.boolean() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: current, error: readError } = await supabaseAdmin
+      .from("site_settings")
+      .select("sections")
+      .eq("id", "default")
+      .single();
+    if (readError) throw new Error(readError.message);
+    const sections = {
+      ...((current.sections as Record<string, boolean> | null) ?? {}),
+      packages_enabled: data.enabled,
+    };
+    const { error } = await supabaseAdmin
+      .from("site_settings")
+      .update({ sections })
+      .eq("id", "default");
+    if (error) throw new Error(error.message);
+    return { sections };
+  });

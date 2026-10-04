@@ -15,6 +15,7 @@ import {
 } from "./owner-manage.schemas";
 import { fillAgreementTemplate } from "./agreement/fill-template";
 import { canUseMenu } from "./plans";
+import { isPackagesEnabled } from "./packages-enabled.server";
 
 /**
  * Owner self-service operations.
@@ -143,11 +144,10 @@ export async function updateOwnerPhotos(actor: Actor, businessId: string, input:
 }
 
 /**
- * Phase 1 of the required post-payment step: save the billing fields, then return the Partnership
- * Agreement filled with exactly those fields, rendered as a normal page (not a generated file) for
- * the owner to read in phase 2. Ownership and the "all fields required" check are enforced again in
- * `save_business_billing_fields` itself, so a direct RPC call can never bypass them. Does not
- * complete the step — see `acceptPartnershipAgreement`.
+ * The billing/invoice info form, reachable any time from the portal (not just post-signup): saving
+ * it completes immediately once every field is present — that's what unlocks selecting a paid
+ * package. Ownership and the "all fields required" check are enforced again in
+ * `save_business_billing_fields` itself, so a direct RPC call can never bypass them.
  */
 export async function saveBusinessBillingFields(
   actor: Actor,
@@ -166,20 +166,31 @@ export async function saveBusinessBillingFields(
     _representative_title: input.representative_title,
   });
   if (error) throw new Error(friendlyDbError(error.message));
-
-  const agreementHtml = fillAgreementTemplate({
-    tradeName: input.trade_name,
-    crNumber: input.cr_number,
-    taxNumber: input.tax_number ?? null,
-    address: input.address,
-    email: input.email,
-    representativeName: input.representative_name,
-    representativeTitle: input.representative_title,
-  });
-  return { agreementHtml };
+  return { ok: true as const };
 }
 
-/** Phase 2: accept the agreement reviewed in phase 1. This is what actually unblocks the portal. */
+/**
+ * The first-login gate: the Partnership Agreement filled with whatever is known about the business
+ * yet (its name, and the owner's own account email) — everything else (CR/tax number, address,
+ * representative) is shown exactly as unfilled as the source document, since the billing-info form
+ * that collects those happens later, separately, and isn't required to reach the dashboard.
+ */
+export async function getFirstLoginAgreement(
+  actor: Actor,
+  businessId: string,
+  email: string | null,
+) {
+  await requireOwnerAccess(actor, businessId);
+  const { data: row, error } = await actor.adminClient
+    .from("businesses")
+    .select("name")
+    .eq("id", businessId)
+    .single();
+  if (error) throw new Error(error.message);
+  return { agreementHtml: fillAgreementTemplate({ tradeName: row.name, email }) };
+}
+
+/** Accepting the agreement is what actually unblocks the owner's dashboard. */
 export async function acceptPartnershipAgreement(
   actor: Actor,
   businessId: string,
@@ -286,16 +297,28 @@ export async function deleteOwnerLink(actor: Actor, businessId: string, id: stri
   return { ok: true as const };
 }
 
-/** Menu items are Pro/Premium only. Admins may still manage any business on its owner's behalf. */
+/**
+ * Menu items are Pro/Premium only — except while packages are platform-disabled, when every
+ * business gets Premium entitlements for free. Admins may still manage any business regardless.
+ */
 async function assertMenuAllowed(actor: Actor, businessId: string, access: Access) {
   if (access.admin) return;
+  if (await isPackagesEnabled(actor.adminClient)) {
+    const { data, error } = await actor.adminClient
+      .from("businesses")
+      .select("plan")
+      .eq("id", businessId)
+      .single();
+    if (error || !data) throw new Error("Forbidden");
+    if (!canUseMenu(data)) throw new Error("Menu items require a Pro or Premium plan");
+    return;
+  }
   const { data, error } = await actor.adminClient
     .from("businesses")
-    .select("plan")
+    .select("id")
     .eq("id", businessId)
     .single();
   if (error || !data) throw new Error("Forbidden");
-  if (!canUseMenu(data)) throw new Error("Menu items require a Pro or Premium plan");
 }
 
 export async function saveMenuItem(actor: Actor, input: MenuItemInput) {
