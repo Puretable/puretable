@@ -58,7 +58,6 @@ export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string })
           );
         })}
       </ul>
-      <p className="text-xs text-muted-foreground">{t("business.gf_menu_note")}</p>
     </section>
   );
 }

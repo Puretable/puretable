@@ -11,6 +11,7 @@ export const Route = createFileRoute("/admin-login")({
 function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(event: FormEvent) {
@@ -19,6 +20,11 @@ function AdminLogin() {
     setBusy(true);
     setError("");
     try {
+      try {
+        window.localStorage.setItem("pt_remember_session", remember ? "1" : "0");
+      } catch {
+        // Storage may be unavailable (private mode); sign-in still works, it just won't persist.
+      }
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -75,6 +81,15 @@ function AdminLogin() {
               onChange={(e) => setPassword(e.target.value)}
               className="mt-2 w-full rounded-lg border bg-background p-3"
             />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="h-4 w-4"
+            />
+            تذكرني
           </label>
           {error && (
             <p role="alert" className="text-sm text-destructive">

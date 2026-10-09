@@ -254,6 +254,7 @@
     "tagline": "A directory of places offering gluten-free options across Saudi Arabia — for anyone living with celiac disease or gluten intolerance.",
     "explore": "Explore",
     "get_in_touch": "Get in touch",
+    "email": "Email",
     "copyright": "Made with care in Saudi Arabia.",
     "legal": "Legal",
     "privacy": "Privacy Policy",
@@ -279,7 +280,7 @@
     "caution_desc": "The business reports that it offers gluten-free options without a fully dedicated kitchen. This information comes from the business and has not been verified by Pure Table. Please confirm with the staff and the specific branch before ordering.",
     "shared_label": "Shared kitchen — precautions taken",
     "shared_desc": "The business reports that food is prepared in a shared kitchen with steps taken to separate tools. A risk of cross-contact remains; this information comes from the business and has not been verified by Pure Table.",
-    "source_note": "All gluten-free information is provided by the business and has not been verified by Pure Table.",
+    "source_note": "All information on this page (gluten-free details and menu) is provided by the business and has not been verified by Pure Table. Please confirm with the restaurant before ordering.",
     "see_disclaimer": "Read the disclaimer"
   },
   "legal": {

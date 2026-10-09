@@ -29,15 +29,7 @@ import { getBusinessReport } from "@/lib/analytics.dashboard.functions";
 import { RANGES, RANGE_LABELS, type RangeKey } from "@/lib/analytics.ranges";
 import { downloadBusinessReportPdf } from "@/lib/export-pdf";
 
-import {
-  ArrowLeft,
-  Upload,
-  Loader2,
-  Save,
-  X,
-  FileText,
-  AlertTriangle,
-} from "lucide-react";
+import { ArrowLeft, Upload, Loader2, Save, X, FileText, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/businesses/$id")({
   component: EditBusiness,
@@ -838,34 +830,35 @@ function EditBusiness() {
         </Section>
       )}
 
-      <div className="sticky bottom-4 flex flex-wrap items-center justify-end gap-2">
-        <span
-          className={`me-auto rounded-full px-3 py-1 text-xs font-medium ${form.published ? "bg-primary/10 text-primary" : "bg-amber-500/15 text-amber-700"}`}
-        >
-          {form.published ? "الحالة: منشور للزوار" : "الحالة: مخفي — بانتظار الموافقة"}
-        </span>
+      <div className="sticky bottom-4 flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-soft)]">
+        <label className="me-auto flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={form.published}
+            onChange={(e) => {
+              const next = e.target.checked;
+              if (
+                next
+                  ? window.confirm("هل حصلت على موافقة المحل؟ بالنشر سيظهر للزوار في قسمه والبحث.")
+                  : window.confirm("سيتم إخفاء هذا المشروع عن الموقع وحفظه كمسودة. متأكد؟")
+              ) {
+                setForm((f: any) => ({ ...f, published: next }));
+              }
+            }}
+            className="h-4 w-4"
+          />
+          <span className={form.published ? "text-primary" : "text-amber-700"}>
+            {form.published ? "منشور للزوار" : "مخفي — بانتظار الموافقة"}
+          </span>
+        </label>
         <button
           type="button"
-          disabled={saving}
-          onClick={() => {
-            if (
-              !form.published ||
-              window.confirm("سيتم إخفاء هذا المشروع عن الموقع وحفظه كمسودة. متأكد؟")
-            )
-              void submit(false);
-          }}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium shadow-[var(--shadow-soft)] disabled:opacity-70"
-        >
-          <FileText className="h-4 w-4" /> حفظ في الأدمن فقط
-        </button>
-        <button
-          type="button"
-          onClick={() => void submit(true)}
+          onClick={() => void submit(form.published)}
           disabled={saving}
           className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-elevated)] disabled:opacity-70"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {form.published ? "حفظ التعديلات المنشورة" : "موافقة ونشر للزوار"}
+          حفظ
         </button>
       </div>
     </div>

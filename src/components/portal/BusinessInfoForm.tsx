@@ -517,7 +517,7 @@ export function BusinessInfoForm({
           className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm text-primary-foreground disabled:opacity-60"
         >
           {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-          حفظ بيانات العمل
+          حفظ التعديلات والنشر
         </button>
       )}
     </form>

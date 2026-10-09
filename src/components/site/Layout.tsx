@@ -123,7 +123,12 @@ export function SiteFooter() {
       icon: MessageCircle,
       href: whatsappHref(val("contact_info.whatsapp")),
     },
-    // Email is not repeated here — it already appears once, as an icon + address, under "Get in touch".
+    {
+      key: "email",
+      label: t("footer.email"),
+      icon: Mail,
+      href: email && email !== "contact_info.email" ? `mailto:${email}` : "",
+    },
   ].filter((s): s is typeof s & { href: string } => !!s.href);
   return (
     <footer className="mt-24 border-t border-border/60 bg-secondary/40">
@@ -160,14 +165,6 @@ export function SiteFooter() {
         <div>
           <h4 className="font-display text-sm font-semibold">{t("footer.get_in_touch")}</h4>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-            {email && email !== "contact_info.email" && (
-              <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />{" "}
-                <a href={`mailto:${email}`} className="hover:text-foreground">
-                  {email}
-                </a>
-              </li>
-            )}
             {phone && phone !== "contact_info.phone" && (
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />{" "}
@@ -231,7 +228,7 @@ export function SiteFooter() {
       <div className="border-t border-border/60">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-4 text-center text-xs text-muted-foreground sm:flex-row sm:px-6 lg:px-8">
           <span>
-            © {new Date().getFullYear()} {t("brand.name")}. {t("footer.copyright")}
+            © {new Date().getFullYear()} {t("brand.name")}.
           </span>
           <DeveloperCredit />
         </div>

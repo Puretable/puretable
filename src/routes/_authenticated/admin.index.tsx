@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -46,11 +46,6 @@ function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Link to="/admin/businesses/$id" params={{ id: "new" }} className="rounded-xl border bg-card p-4 text-sm font-medium hover:border-primary">إضافة عمل جديد <span className="mt-1 block text-xs font-normal text-muted-foreground">البيانات والفروع والتواصل</span></Link>
-        <Link to="/admin/subscriptions" className="rounded-xl border bg-card p-4 text-sm font-medium hover:border-primary">إدارة الاشتراكات <span className="mt-1 block text-xs font-normal text-muted-foreground">باقات الأعمال وتعريف المميزات</span></Link>
-        <Link to="/admin/appearance" className="rounded-xl border bg-card p-4 text-sm font-medium hover:border-primary">تعديل مظهر الموقع <span className="mt-1 block text-xs font-normal text-muted-foreground">الشعار والألوان والترحيب</span></Link>
-      </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold">نظرة عامة وتحليلات</h1>
