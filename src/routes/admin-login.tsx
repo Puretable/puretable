@@ -8,8 +8,17 @@ export const Route = createFileRoute("/admin-login")({
   }),
   component: AdminLogin,
 });
+/** Last admin email used on this device, so it's pre-filled after a sign-out. Never the password. */
+function lastAdminEmail(): string {
+  try {
+    return window.localStorage.getItem("pt_admin_last_email") ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function AdminLogin() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(lastAdminEmail);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -22,6 +31,7 @@ function AdminLogin() {
     try {
       try {
         window.localStorage.setItem("pt_remember_session", remember ? "1" : "0");
+        window.localStorage.setItem("pt_admin_last_email", email);
       } catch {
         // Storage may be unavailable (private mode); sign-in still works, it just won't persist.
       }
