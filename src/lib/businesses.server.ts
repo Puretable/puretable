@@ -31,6 +31,13 @@ export function publicClient() {
   });
 }
 
+// Explicit allowlist for public reads of `businesses` — every column mapDbBusiness() needs, and
+// nothing from the billing/invoice set (that's now business_billing, owner/admin-only). Never
+// select("*") here: a future column added to `businesses` must be deliberately added to this list
+// before it can reach a public response.
+const PUBLIC_BUSINESS_COLUMNS =
+  "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,lat,lng,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,needs_review,review_notes,created_at,updated_at,terms_accepted_at,terms_version,business_info_completed";
+
 function mapLink(link: Record<string, unknown>): BusinessLink {
   return {
     id: String(link.id),
@@ -92,7 +99,10 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
     catalog,
     packagesEnabled,
   ] = await Promise.all([
-    client.from("businesses").select("*").order("created_at", { ascending: true }),
+    client
+      .from("businesses")
+      .select(PUBLIC_BUSINESS_COLUMNS)
+      .order("created_at", { ascending: true }),
     client.from("business_links").select("*"),
     client.from("business_branches").select("*").eq("published", true),
     readPlanCatalog(client),
@@ -132,7 +142,7 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
   const client = publicClient();
   const { data: row, error } = await client
     .from("businesses")
-    .select("*")
+    .select(PUBLIC_BUSINESS_COLUMNS)
     .eq("slug", slug)
     .maybeSingle();
   if (error) throw new Error(error.message);
