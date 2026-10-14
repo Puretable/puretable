@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { allow } from "./rate-limit.server";
+import { AUTHENTICATED_BUSINESS_COLUMNS } from "./businesses.server";
 import {
   acceptPartnershipAgreement,
   deleteMenuItem,
@@ -55,7 +56,7 @@ export const getOwnerBusiness = createServerFn({ method: "GET" })
     const { data: row, error } = await db(context.supabase)
       .from("businesses")
       .select(
-        "*, business_links(*), business_branches(*), business_menu_items(id,business_id,name,name_ar,description,description_ar,price,currency,photo_url,safety,sort_order)",
+        `${AUTHENTICATED_BUSINESS_COLUMNS},business_links(*),business_branches(*),business_menu_items(id,business_id,name,name_ar,description,description_ar,price,currency,photo_url,safety,sort_order)`,
       )
       .eq("id", data.businessId)
       .maybeSingle();

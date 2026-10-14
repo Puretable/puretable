@@ -97,6 +97,7 @@ export async function updateOwnerBusiness(
   // information as it was reviewed, so it is withdrawn whenever that information changes.
   if (current.verified && safetyFieldsChanged(current, input)) payload["verified"] = false;
 
+  // column-grant-safe: adminClient is the service-role client, which bypasses grants entirely.
   const { data, error } = await actor.adminClient
     .from("businesses")
     .update(payload)

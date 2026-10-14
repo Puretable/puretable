@@ -198,9 +198,15 @@ function BusinessesList() {
 
   async function onDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"?`)) return;
-    await del({ data: { id } });
-    qc.invalidateQueries({ queryKey: ["admin-businesses"] });
-    qc.invalidateQueries({ queryKey: ["businesses"] });
+    try {
+      await del({ data: { id } });
+      qc.invalidateQueries({ queryKey: ["admin-businesses"] });
+      qc.invalidateQueries({ queryKey: ["businesses"] });
+    } catch (e: any) {
+      // A failed delete used to fail silently (unhandled rejection, no UI feedback at all) —
+      // this is what made past failures look like "nothing happens".
+      alert(`تعذر الحذف: ${e?.message ?? "خطأ غير معروف"}`);
+    }
   }
 
   async function togglePublish(b: any) {
