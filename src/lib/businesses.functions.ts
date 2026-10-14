@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { BranchInput, BusinessInput, LinkInput } from "@/lib/businesses.schemas";
-import { assertAdmin } from "@/lib/businesses.server";
+import { assertAdmin, AUTHENTICATED_BUSINESS_COLUMNS } from "@/lib/businesses.server";
 import { PLAN_TIERS, type PlanTier } from "@/lib/plans";
 
 // -------- Admin --------
@@ -10,11 +10,17 @@ import { PLAN_TIERS, type PlanTier } from "@/lib/plans";
 /** Publish only after the administrator explicitly confirms the owner's consent. */
 export const setBusinessPublication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid(), published: z.boolean() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid(), published: z.boolean() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { data: row, error } = await context.supabase.from("businesses")
-      .update({ published: data.published }).eq("id", data.id).select("id,published").single();
+    const { data: row, error } = await context.supabase
+      .from("businesses")
+      .update({ published: data.published })
+      .eq("id", data.id)
+      .select("id,published")
+      .single();
     if (error) throw new Error(error.message);
     return row;
   });
@@ -31,7 +37,9 @@ function makeSlug(name: string) {
 
 function readableBranchError(message: string) {
   const match = message.match(/Branch limit reached for (free|pro|premium) plan \(maximum (\d+)\)/);
-  return match ? `الحد الحالي لباقة ${match[1]} هو ${match[2]} فروع منشورة. أخفِ فرعاً أو عدّل الباقة من قسم الاشتراكات.` : message;
+  return match
+    ? `الحد الحالي لباقة ${match[1]} هو ${match[2]} فروع منشورة. أخفِ فرعاً أو عدّل الباقة من قسم الاشتراكات.`
+    : message;
 }
 
 export const upsertBusiness = createServerFn({ method: "POST" })
@@ -49,7 +57,7 @@ export const upsertBusiness = createServerFn({ method: "POST" })
     const { data: row, error } = await context.supabase
       .from("businesses")
       .upsert(payload, { onConflict: "id" })
-      .select()
+      .select(AUTHENTICATED_BUSINESS_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     const { data: branches, error: branchError } = await context.supabase
@@ -71,7 +79,9 @@ export const upsertBusiness = createServerFn({ method: "POST" })
 export const setBusinessPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string; plan: PlanTier }) =>
-    z.object({ id: z.string().uuid(), plan: z.enum(PLAN_TIERS as [PlanTier, ...PlanTier[]]) }).parse(d),
+    z
+      .object({ id: z.string().uuid(), plan: z.enum(PLAN_TIERS as [PlanTier, ...PlanTier[]]) })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
@@ -109,7 +119,6 @@ export const setBusinessPlan = createServerFn({ method: "POST" })
       },
     };
   });
-
 
 export const deleteBusiness = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -175,7 +184,7 @@ export const adminListBusinesses = createServerFn({ method: "GET" })
     await assertAdmin(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("businesses")
-      .select("*, business_links(*), business_branches(*)")
+      .select(`${AUTHENTICATED_BUSINESS_COLUMNS},business_links(*),business_branches(*)`)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -188,7 +197,7 @@ export const adminGetBusiness = createServerFn({ method: "GET" })
     await assertAdmin(context.supabase, context.userId);
     const { data: row, error } = await context.supabase
       .from("businesses")
-      .select("*, business_links(*), business_branches(*)")
+      .select(`${AUTHENTICATED_BUSINESS_COLUMNS},business_links(*),business_branches(*)`)
       .eq("id", data.id)
       .single();
     if (error) throw new Error(error.message);
@@ -210,12 +219,23 @@ function dupKeys(row: { name?: string | null; name_ar?: string | null; slug?: st
   return [norm(row.name), norm(row.name_ar), norm(row.slug)].filter((k) => k.length > 1);
 }
 
-
 /** How much information a row carries — the richest duplicate wins. */
 function richness(row: Record<string, unknown>) {
   const fields = [
-    "name_ar", "city", "city_ar", "address", "address_ar", "phone", "instagram",
-    "website", "cover_url", "description", "products", "maps_url", "lat", "lng",
+    "name_ar",
+    "city",
+    "city_ar",
+    "address",
+    "address_ar",
+    "phone",
+    "instagram",
+    "website",
+    "cover_url",
+    "description",
+    "products",
+    "maps_url",
+    "lat",
+    "lng",
   ];
   let score = fields.filter((f) => {
     const v = row[f];
@@ -237,7 +257,7 @@ export const dedupeBusinesses = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("businesses")
-      .select("*, business_links(id), business_branches(id)");
+      .select(`${AUTHENTICATED_BUSINESS_COLUMNS},business_links(id),business_branches(id)`);
     if (error) throw new Error(error.message);
 
     // Rows are grouped when ANY of their names (Arabic, English or slug) match,
@@ -251,7 +271,6 @@ export const dedupeBusinesses = createServerFn({ method: "POST" })
       for (const k of keys) keyToGroup.set(k, groupId);
       groups.set(groupId, [...(groups.get(groupId) ?? []), row]);
     }
-
 
     const removed: string[] = [];
     for (const rows of groups.values()) {

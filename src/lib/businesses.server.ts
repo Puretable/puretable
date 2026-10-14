@@ -37,8 +37,15 @@ export function publicClient() {
 // before it can reach a public response.
 // Must exactly match the anon grant in supabase/migrations/20261015120000_fix_businesses_column_grants.sql
 // (no needs_review/review_notes — admin-only moderation fields, not granted to anon).
-const PUBLIC_BUSINESS_COLUMNS =
+export const PUBLIC_BUSINESS_COLUMNS =
   "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,lat,lng,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,terms_accepted_at,terms_version,business_info_completed";
+
+// Same as PUBLIC_BUSINESS_COLUMNS, plus the two internal moderation fields that only the
+// `authenticated` role (owners, admins — anyone logged in) is granted, never anon. Any
+// authenticated-context query against `businesses` (admin CRUD, owner self-service saves) must use
+// this instead of select("*")/bare select() — those now fail outright for any role without a
+// blanket table-level grant, which no longer exists on this table after the billing-column fix.
+export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},needs_review,review_notes`;
 
 function mapLink(link: Record<string, unknown>): BusinessLink {
   return {
