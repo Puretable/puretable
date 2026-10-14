@@ -34,6 +34,7 @@ const MessageSchema = z.object({
   email: z.string().trim().email().max(255).or(z.literal("")),
   subject: z.string().trim().max(200),
   message: z.string().trim().min(1).max(4000),
+  company: z.string().trim().max(200).optional().default(""),
 });
 
 function Contact() {
@@ -53,6 +54,7 @@ function Contact() {
       email: String(fd.get("email") ?? ""),
       subject: String(fd.get("subject") ?? ""),
       message: String(fd.get("message") ?? ""),
+      company: String(fd.get("company") ?? ""),
     });
     if (!parsed.success) {
       setError(t("contact.invalid"));
@@ -105,6 +107,18 @@ function Contact() {
           className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-soft)] sm:p-8"
         >
           <h2 className="font-display text-2xl font-semibold">{t("contact.form_title")}</h2>
+
+          {/* Honeypot: hidden from real visitors (and screen readers), bots that fill every field
+              trip it. Never shown, never focusable. */}
+          <input
+            type="text"
+            name="company"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="absolute h-0 w-0 opacity-0"
+            style={{ left: "-9999px" }}
+          />
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <Field
