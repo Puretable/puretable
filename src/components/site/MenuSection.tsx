@@ -17,7 +17,17 @@ export function MenuSafetyBadge({ level }: { level: MenuSafety }) {
 }
 
 /** Public gluten-free menu on the business page. Pro and Premium only (the server omits it for Free). */
-export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string }) {
+export function PublicMenu({
+  items,
+  lang,
+  establishmentLevel = null,
+}: {
+  items: MenuItem[];
+  lang: string;
+  /** The establishment's own kitchen level (green/orange/red), or null when it has none set.
+   *  An item's badge is hidden when it just repeats this level — only differences are flagged. */
+  establishmentLevel?: "green" | "orange" | "red" | null;
+}) {
   const { t } = useTranslation();
   if (!items.length) return null;
   return (
@@ -52,7 +62,7 @@ export function PublicMenu({ items, lang }: { items: MenuItem[]; lang: string })
                 {description && (
                   <p className="break-words text-xs text-muted-foreground">{description}</p>
                 )}
-                <MenuSafetyBadge level={item.safety} />
+                {item.safety !== establishmentLevel && <MenuSafetyBadge level={item.safety} />}
               </div>
             </li>
           );

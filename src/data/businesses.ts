@@ -45,6 +45,18 @@ export type LinkPlatform = (typeof LINK_PLATFORMS)[number];
 /** Table-booking apps — shown in the actions box next to call / maps. */
 export const BOOKING_PLATFORMS: LinkPlatform[] = ["requeue", "mytable"];
 
+/**
+ * Third-party delivery apps — hidden from the public page and from the owner/admin link editor
+ * (display-only; existing saved links of these platforms are kept untouched in the database).
+ */
+export const THIRD_PARTY_DELIVERY_PLATFORMS: LinkPlatform[] = [
+  "hungerstation",
+  "jahez",
+  "thechefz",
+  "toyou",
+  "keeta",
+];
+
 export type BusinessLink = {
   id: string;
   platform: LinkPlatform;

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { THIRD_PARTY_DELIVERY_PLATFORMS } from "@/data/businesses";
 
 /** Platforms an order / contact button can point to. */
 export const PLATFORMS = [
@@ -21,6 +22,11 @@ export const PLATFORMS = [
   "maps",
   "phone",
 ] as const;
+
+// Third-party delivery apps are hidden from this editor (public page and owner/admin forms) —
+// existing saved links of these platforms are kept, just not offered or shown here.
+const HIDDEN_PLATFORMS = new Set<string>(THIRD_PARTY_DELIVERY_PLATFORMS);
+const VISIBLE_PLATFORMS = PLATFORMS.filter((p) => !HIDDEN_PLATFORMS.has(p));
 
 export type LinkRow = {
   id: string;
@@ -60,7 +66,7 @@ export function LinksEditor({
   onDelete: (id: string) => Promise<void>;
 }) {
   const EMPTY: LinkDraft = {
-    platform: "hungerstation",
+    platform: VISIBLE_PLATFORMS[0],
     url: "",
     label: "",
     product_name: "",
@@ -101,36 +107,38 @@ export function LinksEditor({
         </p>
       )}
       <div className="space-y-2">
-        {links.map((l) => (
-          <div
-            key={l.id}
-            className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[120px_1fr_1fr_auto]"
-          >
-            <span className="text-xs font-semibold capitalize text-primary">{l.platform}</span>
-            <span className="truncate text-xs">
-              {l.product_name || <span className="text-muted-foreground">(no product name)</span>}
-              {l.branch_id && (
-                <span className="ms-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {branchName(l.branch_id) ?? "فرع"}
-                </span>
-              )}
-            </span>
-            <a
-              href={l.url}
-              target="_blank"
-              rel="noreferrer"
-              className="truncate text-xs text-muted-foreground hover:text-primary"
+        {links
+          .filter((l) => !HIDDEN_PLATFORMS.has(l.platform))
+          .map((l) => (
+            <div
+              key={l.id}
+              className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-[120px_1fr_1fr_auto]"
             >
-              {l.url}
-            </a>
-            <button
-              onClick={() => void remove(l.id)}
-              className="justify-self-end text-xs text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
+              <span className="text-xs font-semibold capitalize text-primary">{l.platform}</span>
+              <span className="truncate text-xs">
+                {l.product_name || <span className="text-muted-foreground">(no product name)</span>}
+                {l.branch_id && (
+                  <span className="ms-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                    {branchName(l.branch_id) ?? "فرع"}
+                  </span>
+                )}
+              </span>
+              <a
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-xs text-muted-foreground hover:text-primary"
+              >
+                {l.url}
+              </a>
+              <button
+                onClick={() => void remove(l.id)}
+                className="justify-self-end text-xs text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
       </div>
       <div className="grid gap-2 rounded-xl border border-dashed border-border p-3 sm:grid-cols-[140px_1fr_1fr_auto]">
         <select
@@ -140,7 +148,7 @@ export function LinksEditor({
           }
           className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
         >
-          {PLATFORMS.map((p) => (
+          {VISIBLE_PLATFORMS.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>

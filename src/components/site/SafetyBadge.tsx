@@ -22,7 +22,9 @@ export function SafetyBadge({ level, size = "sm" }: { level: SafetyLevel; size?:
   return (
     <span
       className={`inline-flex w-fit items-center gap-1.5 rounded-full border bg-background/90 font-medium backdrop-blur ${
-        safe ? "border-safety-safe/40 text-safety-safe" : "border-safety-caution/40 text-safety-caution"
+        safe
+          ? "border-safety-safe/40 text-safety-safe"
+          : "border-safety-caution/40 text-safety-caution"
       } ${size === "md" ? "px-3 py-1.5 text-xs" : "px-2.5 py-1 text-[11px]"}`}
     >
       <SafetyDot level={level} />
@@ -46,6 +48,24 @@ export function SharedKitchenBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   );
 }
 
+/**
+ * The one merged disclaimer (not verified, not a medical guarantee, confirm ingredients and
+ * allergens, link to the full page). Rendered exactly once per page, inside whichever box is
+ * shown first — the main green/red box, or the shared-kitchen box when there is no main box, or
+ * as a standalone line when neither box is shown (safety level "none").
+ */
+function DisclaimerLine({ disclaimerHref }: { disclaimerHref: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {t("safety.source_note")}{" "}
+      <a href={disclaimerHref} className="font-medium text-primary underline underline-offset-2">
+        {t("safety.see_disclaimer")}
+      </a>
+    </>
+  );
+}
+
 export function SafetyNote({
   level,
   sharedKitchen = false,
@@ -60,22 +80,27 @@ export function SafetyNote({
 }) {
   const { t } = useTranslation();
   const safe = level === "green";
+  const hasMainBox = level !== "none";
   return (
     <div className="space-y-3">
-      {level !== "none" && (
+      {hasMainBox && (
         <div
           className={`rounded-2xl border p-4 ${
-            safe ? "border-safety-safe/30 bg-safety-safe/5" : "border-safety-caution/30 bg-safety-caution/5"
+            safe
+              ? "border-safety-safe/30 bg-safety-safe/5"
+              : "border-safety-caution/30 bg-safety-caution/5"
           }`}
         >
           <div className="flex items-center gap-2">
             <SafetyDot level={level} />
-            <span className={`text-sm font-semibold ${safe ? "text-safety-safe" : "text-safety-caution"}`}>
+            <span
+              className={`text-sm font-semibold ${safe ? "text-safety-safe" : "text-safety-caution"}`}
+            >
               {t(safe ? "safety.safe_label" : "safety.caution_label")}
             </span>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {t(safe ? "safety.safe_desc" : "safety.caution_desc")}
+            <DisclaimerLine disclaimerHref={disclaimerHref} />
           </p>
         </div>
       )}
@@ -83,21 +108,36 @@ export function SafetyNote({
         <div className="rounded-2xl border border-safety-shared/30 bg-safety-shared/5 p-4">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-shared" />
-            <span className="text-sm font-semibold text-safety-shared">{t("safety.shared_label")}</span>
+            <span className="text-sm font-semibold text-safety-shared">
+              {t("safety.shared_label")}
+            </span>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {precautionsNote?.trim() || t("safety.shared_desc")}
           </p>
+          {!hasMainBox && (
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <DisclaimerLine disclaimerHref={disclaimerHref} />
+            </p>
+          )}
         </div>
       )}
-      {/* The caveat is never shown without a way to read the full disclaimer. */}
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        {t("safety.source_note")}{" "}
-        <a href={disclaimerHref} className="font-medium text-primary underline underline-offset-2">
-          {t("safety.see_disclaimer")}
-        </a>
-      </p>
+      {!hasMainBox && !sharedKitchen && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          <DisclaimerLine disclaimerHref={disclaimerHref} />
+        </p>
+      )}
     </div>
   );
 }
 
+/** The establishment's overall kitchen level, in the same green/orange/red domain as menu-item
+ * safety badges — used to hide a per-item badge that just repeats the establishment's own level. */
+export function establishmentMenuLevel(
+  level: SafetyLevel,
+  sharedKitchen: boolean,
+): "green" | "orange" | "red" | null {
+  if (sharedKitchen) return "orange";
+  if (level === "none") return null;
+  return level;
+}

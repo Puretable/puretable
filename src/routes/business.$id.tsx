@@ -6,8 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   MapPin,
   Phone,
-  Instagram,
-  Globe,
   Clock,
   ExternalLink,
   ArrowLeft,
@@ -23,10 +21,11 @@ import { Page } from "@/components/site/Layout";
 import { usePageView } from "@/hooks/use-page-view";
 import { useMemo, useState } from "react";
 import { BranchesMap } from "@/components/site/BranchesMap";
-import { distanceKm, hasCategory } from "@/data/businesses";
+import { distanceKm, hasCategory, THIRD_PARTY_DELIVERY_PLATFORMS } from "@/data/businesses";
 import { SERVICE_DEFS } from "@/lib/services";
 import { useFilters } from "@/lib/filters";
-import { SafetyNote } from "@/components/site/SafetyBadge";
+import { SafetyNote, establishmentMenuLevel } from "@/components/site/SafetyBadge";
+import { OrderContactBox } from "@/components/site/OrderContactBox";
 import { FavoriteButton } from "@/components/site/FavoriteButton";
 import { CoverImage } from "@/components/site/CoverImage";
 import { goHref } from "@/lib/track";
@@ -39,8 +38,6 @@ import {
 import { featuresOf, visibleDescription, visiblePhotos } from "@/lib/plans";
 
 import { getBusinessBySlug } from "@/lib/businesses.public.functions";
-import { useSiteText } from "@/hooks/use-site-settings";
-import { actionGroupOf } from "@/lib/site-settings";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
 import type { BusinessLink, LinkPlatform } from "@/data/businesses";
@@ -132,7 +129,9 @@ export const Route = createFileRoute("/business/$id")({
   component: BusinessDetail,
 });
 
-const PLATFORM_LABEL: Record<LinkPlatform, string> = {
+// Brand names stay the same in both languages (same convention as the footer's social icons).
+// Generic action labels (call, maps, website) are translated — see platformLabel() below.
+const BRAND_LABEL: Partial<Record<LinkPlatform, string>> = {
   hungerstation: "HungerStation",
   jahez: "Jahez",
   thechefz: "The Chefz",
@@ -140,7 +139,6 @@ const PLATFORM_LABEL: Record<LinkPlatform, string> = {
   keeta: "Keeta",
   requeue: "Requeue",
   mytable: "My Table",
-  website: "Official Website",
   instagram: "Instagram",
   x: "X (Twitter)",
   tiktok: "TikTok",
@@ -148,9 +146,14 @@ const PLATFORM_LABEL: Record<LinkPlatform, string> = {
   facebook: "Facebook",
   whatsapp: "WhatsApp",
   email: "Email",
-  maps: "Google Maps",
-  phone: "Call Now",
 };
+
+function platformLabel(platform: LinkPlatform, t: (key: string) => string): string {
+  if (platform === "phone") return t("business.call_now");
+  if (platform === "maps") return t("business.open_in_maps");
+  if (platform === "website") return t("business.website_label");
+  return BRAND_LABEL[platform] ?? platform;
+}
 
 function BusinessDetail() {
   const { business: initial } = Route.useLoaderData() as {
@@ -165,9 +168,6 @@ function BusinessDetail() {
   const { t } = useTranslation();
   const { lang } = useLanguage();
   const { secondary: categoryFilters } = useFilters();
-  // Site-wide order of the action boxes, editable from Appearance.
-  const { layout: siteLayout } = useSiteText();
-  const actionOrder = siteLayout.actions;
 
   usePageView({ business_slug: id, city: b?.city });
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
@@ -244,58 +244,21 @@ function BusinessDetail() {
       ]
     : [];
 
-  // Compose the full action-button list: DB links + implicit maps/phone/instagram.
-  const implicit: BusinessLink[] = [];
   const savedLinks = b.links;
-  const savedPlatforms = new Set(savedLinks.map((link) => link.platform));
-  if (b.phone && !savedPlatforms.has("phone"))
-    implicit.push({
-      id: "phone",
-      platform: "phone",
-      url: `tel:${b.phone.replace(/\s/g, "")}`,
-      sort_order: 90,
-    });
-  const waUrl = whatsappHref(b.whatsapp, whatsappMessage);
-  if (waUrl && !savedPlatforms.has("whatsapp"))
-    implicit.push({ id: "whatsapp", platform: "whatsapp", url: waUrl, sort_order: 88 });
-  if (b.website && !savedPlatforms.has("website")) {
-    implicit.push({ id: "website", platform: "website", url: b.website, sort_order: 85 });
-  }
-  if (b.instagram && !savedPlatforms.has("instagram")) {
-    const igUrl = instagramHref(b.instagram);
-    if (igUrl)
-      implicit.push({ id: "instagram", platform: "instagram", url: igUrl, sort_order: 80 });
-  }
-  if (showLocation)
-    implicit.push({
-      id: "maps",
-      platform: "maps",
-      label: t("business.open_in_maps"),
-      url: mapsUrl,
-      sort_order: 70,
-    });
-  // Delivery apps are shown ONLY when the admin added a link for this business.
-  const DELIVERY_PLATFORMS = new Set<LinkPlatform>([
-    "hungerstation",
-    "jahez",
-    "thechefz",
-    "toyou",
-    "keeta",
-  ]);
-  // Display order of the action boxes is a site-wide setting the admin can
-  // reorder from Appearance (call, WhatsApp, location, booking, delivery, …).
-  const groupRank = (platform: string) => {
-    const i = actionOrder.indexOf(actionGroupOf(platform));
-    return i === -1 ? 99 : i;
-  };
   // Package gating: the Free page keeps name, category, location, directions
-  // and phone only. Delivery, booking, website, WhatsApp and menu/product links
-  // belong to the paid packages.
+  // and phone only. WhatsApp, TikTok and menu/product links belong to the paid packages.
   const plan = featuresOf(b);
-  const FREE_PLATFORMS = new Set<string>(["maps", "phone", "instagram"]);
-  const allLinks = [...savedLinks, ...implicit]
-    .filter((l) => plan.showLinks || FREE_PLATFORMS.has(l.platform))
-    .sort((x, y) => groupRank(x.platform) - groupRank(y.platform));
+  const whatsappNumber = plan.showLinks ? (b.whatsapp ?? null) : null;
+  const tiktokUrl = plan.showLinks
+    ? (savedLinks.find((l) => l.platform === "tiktok")?.url ?? null)
+    : null;
+  const instagramUrl = instagramHref(b.instagram);
+  const mapsHref = showLocation
+    ? goHref({ to: mapsUrl, type: "click_maps", business: b.id, platform: "maps" })
+    : null;
+  const pickupEnabled = hasCategory(b, "svc_pickup");
+  const deliveryEnabled = hasCategory(b, "svc_delivery");
+  const menuItems = b.menu ?? [];
   const gallery = visiblePhotos(b).slice(1);
 
   // Branches shown as saved; closed ones stay visible but flagged. Customers can
@@ -346,7 +309,9 @@ function BusinessDetail() {
             to: destination,
             type:
               EVENT_TYPE[l.platform] ??
-              (DELIVERY_PLATFORMS.has(l.platform) ? "click_delivery" : "click_link"),
+              (THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform)
+                ? "click_delivery"
+                : "click_link"),
             business: b.id,
             linkId: l.id.length === 36 && l.id.includes("-") ? l.id : null,
             platform: l.platform,
@@ -410,7 +375,20 @@ function BusinessDetail() {
                 {products && (
                   <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
                     <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <p className="text-sm text-foreground">{products}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {products
+                        .split("-")
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                        .map((part, i) => (
+                          <span
+                            key={`${part}-${i}`}
+                            className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-foreground"
+                          >
+                            {part}
+                          </span>
+                        ))}
+                    </div>
                   </div>
                 )}
 
@@ -420,7 +398,11 @@ function BusinessDetail() {
                   </p>
                 )}
 
-                <PublicMenu items={b.menu ?? []} lang={lang} />
+                <PublicMenu
+                  items={menuItems}
+                  lang={lang}
+                  establishmentLevel={establishmentMenuLevel(safetyLevel, !!b.sharedKitchen)}
+                />
 
                 {gallery.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -585,19 +567,21 @@ function BusinessDetail() {
                               >
                                 <MapPin className="h-3.5 w-3.5" /> {t("business.open_in_maps")}
                               </a>
-                              {/* Booking / delivery links saved for this branch only. */}
-                              {(plan.showLinks ? (br.links ?? []) : []).map((l) => (
-                                <a
-                                  key={l.id}
-                                  href={trackedHref(l)}
-                                  target={l.platform === "phone" ? undefined : "_blank"}
-                                  rel="noreferrer noopener"
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
-                                >
-                                  {l.label || PLATFORM_LABEL[l.platform]}
-                                  <ExternalLink className="h-3 w-3 rtl:rotate-180" />
-                                </a>
-                              ))}
+                              {/* Booking links saved for this branch only (third-party delivery hidden). */}
+                              {(plan.showLinks ? (br.links ?? []) : [])
+                                .filter((l) => !THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform))
+                                .map((l) => (
+                                  <a
+                                    key={l.id}
+                                    href={trackedHref(l)}
+                                    target={l.platform === "phone" ? undefined : "_blank"}
+                                    rel="noreferrer noopener"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
+                                  >
+                                    {l.label || platformLabel(l.platform, t)}
+                                    <ExternalLink className="h-3 w-3 rtl:rotate-180" />
+                                  </a>
+                                ))}
                             </div>
                           </div>
                         );
@@ -643,41 +627,18 @@ function BusinessDetail() {
                   </div>
                 )}
 
-                {allLinks.length > 0 && (
-                  <div className="rounded-2xl border border-border bg-secondary/40 p-5">
-                    <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("business.contact_booking")}
-                    </h3>
-                    <p className="mt-1 text-xs text-muted-foreground">{t("business.order_note")}</p>
-                    <div className="mt-4 space-y-2">
-                      {allLinks.map((l) => (
-                        <a
-                          key={l.id}
-                          href={trackedHref(l)}
-                          target={l.platform === "phone" ? undefined : "_blank"}
-                          rel="noreferrer noopener"
-                          className="flex items-center justify-between gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-                        >
-                          <span className="flex items-center gap-2">
-                            {l.platform === "phone" && <Phone className="h-4 w-4" />}
-                            {l.platform === "instagram" && <Instagram className="h-4 w-4" />}
-                            {l.platform === "maps" && <MapPin className="h-4 w-4" />}
-                            {l.platform === "website" && <Globe className="h-4 w-4" />}
-                            {l.platform === "whatsapp" && <MessageCircle className="h-4 w-4" />}
-                            {(l.platform === "requeue" || l.platform === "mytable") && (
-                              <CalendarCheck className="h-4 w-4" />
-                            )}
-                            {l.label || PLATFORM_LABEL[l.platform]}
-                            {l.product_name ? (
-                              <span className="opacity-80">— {l.product_name}</span>
-                            ) : null}
-                          </span>
-                          <ExternalLink className="h-4 w-4 rtl:rotate-180" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <OrderContactBox
+                  businessSlug={b.id}
+                  whatsappNumber={whatsappNumber}
+                  phone={b.phone ?? null}
+                  mapsHref={mapsHref}
+                  instagramUrl={instagramUrl}
+                  tiktokUrl={tiktokUrl}
+                  pickupEnabled={pickupEnabled}
+                  deliveryEnabled={deliveryEnabled}
+                  menuItems={menuItems}
+                  lang={lang}
+                />
               </aside>
             </div>
           </div>
