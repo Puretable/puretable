@@ -2,6 +2,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useTranslation } from "react-i18next";
 import {
   CalendarCheck,
+  Home as HomeIcon,
   List,
   Loader2,
   Map as MapIcon,
@@ -57,6 +58,7 @@ export function CategoryPage({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [premiumOnly, setPremiumOnly] = useState(initialPremiumOnly);
   const [bookingOnly, setBookingOnly] = useState(initialBookingOnly);
+  const [homeOnly, setHomeOnly] = useState(false);
   const [position, setPosition] = useState<Coordinates | null>(null);
   const [manualCity, setManualCity] = useState<string | null>(null);
   const [manualDistrict, setManualDistrict] = useState<string | null>(null);
@@ -103,29 +105,29 @@ export function CategoryPage({
     void requestNearby();
   }, [requestNearby, requestNearbyOnMount]);
 
-  const results = useMemo(
-    () =>
-      discoverBusinesses(items, {
-        query: deferredQuery,
-        categories: selectedCategories,
-        premiumOnly,
-        bookingOnly,
-        position,
-        nearbyOnly: !!position,
-        cityKey: manualCity,
-        districtKey: manualDistrict,
-      }),
-    [
-      bookingOnly,
-      deferredQuery,
-      items,
-      manualCity,
-      manualDistrict,
-      position,
+  const results = useMemo(() => {
+    const base = discoverBusinesses(items, {
+      query: deferredQuery,
+      categories: selectedCategories,
       premiumOnly,
-      selectedCategories,
-    ],
-  );
+      bookingOnly,
+      position,
+      nearbyOnly: !!position,
+      cityKey: manualCity,
+      districtKey: manualDistrict,
+    });
+    return homeOnly ? base.filter((result) => hasCategory(result.business, "home")) : base;
+  }, [
+    bookingOnly,
+    deferredQuery,
+    homeOnly,
+    items,
+    manualCity,
+    manualDistrict,
+    position,
+    premiumOnly,
+    selectedCategories,
+  ]);
   const filtered = useMemo(() => results.map((result) => result.business), [results]);
 
   useEffect(() => {
@@ -138,7 +140,11 @@ export function CategoryPage({
     ?.districts.find((district) => district.key === manualDistrict)?.label;
   const locationActive = !!position || !!manualCity;
   const activeCount =
-    selectedCategories.length + Number(premiumOnly) + Number(bookingOnly) + Number(locationActive);
+    selectedCategories.length +
+    Number(premiumOnly) +
+    Number(bookingOnly) +
+    Number(homeOnly) +
+    Number(locationActive);
 
   const chip = (active: boolean) =>
     `inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium transition ${
@@ -151,6 +157,7 @@ export function CategoryPage({
     setSelectedCategories([]);
     setPremiumOnly(false);
     setBookingOnly(false);
+    setHomeOnly(false);
     setPosition(null);
     setManualCity(null);
     setManualDistrict(null);
@@ -227,6 +234,14 @@ export function CategoryPage({
               {manualCityLabel
                 ? [manualCityLabel, manualDistrictLabel].filter(Boolean).join(" — ")
                 : t("filters.choose_manually")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setHomeOnly((value) => !value)}
+              className={chip(homeOnly)}
+              aria-pressed={homeOnly}
+            >
+              <HomeIcon className="h-3.5 w-3.5" /> {t("filters.home_only")}
             </button>
           </div>
 

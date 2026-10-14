@@ -198,7 +198,7 @@ function BusinessDetail() {
   // only delivery links, social accounts and phone.
   // Home businesses ("أسر منتجة") are shown without any Google Maps location —
   // unless real branches were saved, the map always wins over the flag.
-  const showLocation = branchList.length > 0 || (!b.noLocation && b.category !== "home");
+  const showLocation = branchList.length > 0 || (!b.noLocation && !hasCategory(b, "home"));
 
   const hasCoords = showLocation && !!(b.lat && b.lng);
   const safetyLevel = b.safety ?? (b.dedicatedGf ? "green" : "red");
@@ -349,8 +349,15 @@ function BusinessDetail() {
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-elevated)] sm:p-10">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
               <div className="min-w-0">
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
-                  {categoryLabel}
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
+                    {categoryLabel}
+                  </span>
+                  {hasCategory(b, "home") && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                      <Building2 className="h-3 w-3" /> {t("filters.home_badge")}
+                    </span>
+                  )}
                 </span>
                 <h1 className="mt-3 font-display text-3xl font-semibold leading-tight sm:text-4xl">
                   {name}

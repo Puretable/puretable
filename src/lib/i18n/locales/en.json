@@ -67,6 +67,8 @@
     "khobar": "Khobar"
   },
   "filters": {
+    "home_only": "Home businesses only",
+    "home_badge": "Home business",
     "all_cities": "All cities",
     "list_view": "List",
     "map_view": "Map",

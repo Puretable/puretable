@@ -67,6 +67,8 @@
     "khobar": "الخبر"
   },
   "filters": {
+    "home_only": "أسر منتجة فقط",
+    "home_badge": "أسرة منتجة",
     "all_cities": "كل المدن",
     "list_view": "قائمة",
     "map_view": "خريطة",

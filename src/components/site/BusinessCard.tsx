@@ -1,7 +1,7 @@
-import { MapPin, ArrowRight } from "lucide-react";
+import { MapPin, ArrowRight, Home as HomeIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import type { Business } from "@/data/businesses";
+import { hasCategory, type Business } from "@/data/businesses";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { CoverImage } from "./CoverImage";
 import { SafetyBadge, SharedKitchenBadge } from "./SafetyBadge";
@@ -31,6 +31,11 @@ export function BusinessCard({ b, distance = null }: { b: Business; distance?: n
         <span className="absolute top-3 flex flex-col items-start gap-1.5 ltr:left-3 rtl:right-3">
           <SafetyBadge level={b.safety ?? (b.dedicatedGf ? "green" : "red")} />
           {b.sharedKitchen ? <SharedKitchenBadge /> : null}
+          {hasCategory(b, "home") && (
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-background/90 px-2.5 py-1 text-[11px] font-medium text-muted-foreground backdrop-blur">
+              <HomeIcon className="h-3 w-3" /> {t("filters.home_badge")}
+            </span>
+          )}
         </span>
       </Link>
       <FavoriteButton b={b} className="absolute top-3 z-10 ltr:right-3 rtl:left-3" />
