@@ -207,6 +207,8 @@
     "menu_select_hint": "Pick items from the menu (optional) to add them to your message.",
     "qty": "Qty",
     "selected_items_label": "Requested items",
+    "order_method_label": "Order method",
+    "items_label": "Items",
     "confirm_with_establishment": "Please confirm ingredients, allergens, and availability with the establishment.",
     "location": "Location",
     "disclaimer": "Information is provided for reference only. Menus, ingredients, preparation methods, suppliers, and gluten-free availability may change at any time. Always confirm directly with the business before ordering. Pure Table is not responsible for changes made by businesses after publication.",

@@ -64,17 +64,18 @@ export function OrderContactBox({
       const methodLabel = t(
         method === "pickup" ? "business.pickup_choice" : "business.delivery_choice",
       );
-      lines.push(`${t("business.choose_method")}: ${methodLabel}`);
+      lines.push(`${t("business.order_method_label")}: ${methodLabel}`);
     }
     const itemLines = menuItems
       .filter((item) => selected[item.id])
       .map((item) => {
         const name = lang === "ar" ? item.name_ar || item.name : item.name;
-        return `${name} ×${selected[item.id]}`;
+        return `- ${name} ×${selected[item.id]}`;
       });
-    if (itemLines.length)
-      lines.push(`${t("business.selected_items_label")}: ${itemLines.join("، ")}`);
-    lines.push(t("business.confirm_with_establishment"));
+    if (itemLines.length) {
+      lines.push(`${t("business.items_label")}:`);
+      lines.push(...itemLines);
+    }
     return lines.join("\n");
   }
 

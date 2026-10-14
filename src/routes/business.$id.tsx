@@ -599,7 +599,10 @@ function BusinessDetail() {
                 )}
               </div>
 
-              <aside className="space-y-4">
+              {/* On mobile this jumps above the (long) main column so the WhatsApp/call button —
+                  and the single disclaimer right above this grid — stay close together; the
+                  side-by-side desktop layout is unaffected. */}
+              <aside className="order-first space-y-4 lg:order-none">
                 {b.discountCode && (
                   <div className="rounded-2xl border border-primary/30 bg-primary-soft p-5">
                     <p className="text-xs font-semibold text-primary">

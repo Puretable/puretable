@@ -5,11 +5,10 @@
  */
 
 /**
- * The message every business WhatsApp button opens the chat with. One wording for all visitors and
+ * The greeting every business WhatsApp button opens the chat with. One wording for all visitors and
  * both site languages, so it is easy to recognise and count on the business side.
  */
-export const WHATSAPP_INQUIRY_MESSAGE =
-  "أهلًا، وصلت لكم عن طريق Pure Table وأرغب بالاستفسار عن الخيارات الخالية من الجلوتين.";
+export const WHATSAPP_INQUIRY_MESSAGE = "أهلاً، وصلت لكم عن طريق منصة بيور تيبل.";
 
 /**
  * Percent-encode a chat message for a WhatsApp link.

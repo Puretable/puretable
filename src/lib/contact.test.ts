@@ -12,15 +12,14 @@ import { extractUrl } from "@/lib/link-url";
 import { isKnownHost } from "@/lib/outbound";
 
 /** The exact wording requested for business WhatsApp buttons. */
-const MESSAGE =
-  "أهلًا، وصلت لكم عن طريق Pure Table وأرغب بالاستفسار عن الخيارات الخالية من الجلوتين.";
+const MESSAGE = "أهلاً، وصلت لكم عن طريق منصة بيور تيبل.";
 
 describe("business WhatsApp inquiry message", () => {
   test("is the exact requested wording, for both site languages", () => {
     assert.equal(WHATSAPP_INQUIRY_MESSAGE, MESSAGE);
     assert.equal(pureTableWhatsAppMessage(), MESSAGE);
-    assert.ok(MESSAGE.endsWith("الجلوتين."));
-    assert.ok(MESSAGE.includes("Pure Table"));
+    assert.ok(MESSAGE.endsWith("بيور تيبل."));
+    assert.ok(MESSAGE.includes("بيور تيبل"));
   });
 
   test("opens WhatsApp with the message pre-filled for a saved number", () => {
