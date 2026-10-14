@@ -5,10 +5,49 @@ this first if picking the project back up.
 
 ## What is live right now
 
-- **Production commit:** `d4069a9` — tag `release-2026-10-14-secure` (pushed, points here).
+- **Production commit:** `81e0837`.
 - **Production URL:** https://www.puretable.co
 - **GitHub `main` = production.** No unmerged or stale branches exist.
 - Deploys in this project are done via the Vercel CLI directly (`npx vercel@59.25.0 --prod --yes --scope pure-table1`), **not** Vercel's GitHub auto-deploy integration — pushing to `main` alone does not deploy. Someone has to run the CLI command (or reconnect the GitHub integration in Vercel's dashboard).
+
+## Incident: billing-exposure fix broke the admin/filter pages (same day, fixed)
+
+**Symptom:** right after the billing-column-grant fix (`d4069a9`) went live, the 5 category filter
+pages and the admin "Business & Branches" list started showing zero businesses, even though the real
+business count hadn't changed.
+
+**First confirmed, before touching anything:** a live anon-key read of `businesses` showed the row(s)
+were still there — this was never a data-loss incident, no `DELETE` was ever run.
+
+**Root cause:** `d4069a9` revoked the table's blanket table-level `SELECT` grant for `anon` AND
+`authenticated` and replaced it with column-level grants. That's correct for closing the billing leak,
+but it also means **any query still using `select("*")` or a bare `.select()` against `businesses` now
+fails outright** (`42501 permission denied`) instead of just omitting ungranted columns — a genuine
+Postgres/PostgREST behavior difference from what was assumed when writing that fix. Several call sites
+still did this: `adminListBusinesses`, `adminGetBusiness`, `dedupeBusinesses`, `upsertBusiness`'s save
+(all in `businesses.functions.ts`, running as `authenticated`), and the `get_gluten_free_place` MCP
+tool (running as `anon`). The public listing/detail queries had already been fixed in `d5eddd1`, so
+`شركاء الإطلاق` (a different table) and some pages kept working, which is what made this look
+inconsistent at first.
+
+**Fix (`81e0837`, code only, no database change):** exported `PUBLIC_BUSINESS_COLUMNS` (anon-safe) and
+a new `AUTHENTICATED_BUSINESS_COLUMNS` (same list + `needs_review`/`review_notes`, which `authenticated`
+is actually granted) from `businesses.server.ts`, and pointed every remaining `select("*")`/bare
+`select()` against `businesses` at the matching explicit list. `owner-manage.server.ts` was untouched —
+it already uses the service-role client there, which bypasses grants entirely and was never affected.
+
+**Verified after deploy, anon key, live:** the exact query `fetchPublicBusinesses()` now sends returns
+the real business row successfully, and the billing columns are still correctly blocked (fix didn't
+regress). The admin-side (`authenticated`) path is the same explicit-column-list pattern, confirmed
+granted in `20261015120000_fix_businesses_column_grants.sql` — ask the user to confirm the admin
+Business & Branches page directly, since a live authenticated-role check wasn't done from this session
+(would have meant creating a throwaway login, which the user asked not to do mid-incident).
+
+**Lesson for next time:** `select("*")` and `supabase.from(x).select()` with no args are not safe
+defaults on any table where column-level grants might ever be narrower than table-level ones — treat
+every `businesses` (or similarly sensitive table) query as needing an explicit column list, and when
+narrowing a table's grants, grep the whole codebase for `select("*"` / bare `.select()` against that
+table *before* considering the grant change done.
 
 ## Supabase projects — which is which
 
@@ -31,6 +70,7 @@ this first if picking the project back up.
 
 | Commit | What it was | Rollback |
 |---|---|---|
+| `81e0837` | Incident fix: restored admin/filter pages broken by `d4069a9` (explicit column lists instead of `select("*")`) | `git revert 81e0837`, push, redeploy — but this re-breaks the admin/filter pages, so fix forward instead if something's still wrong. |
 | `d4069a9` | Corrected `businesses` column grants (the real fix for the billing-field exposure) | `git revert d4069a9`, push, redeploy. **Do not actually roll this back** — it's the fix; rolling back re-opens the exposure. If something breaks, fix forward instead. |
 | `8af8787` / `daf4618` | SQL migrations for the billing-exposure fix (table, functions, grants) | See the rollback SQL given inline when each file was presented to the user (also preserved in this chat's history) — not repeated here since they're DB-only, no app code to revert. |
 | `920e3f1` | Contact form rate limiting + honeypot | `git revert 920e3f1`, push, redeploy |
