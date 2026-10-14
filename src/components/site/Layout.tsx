@@ -7,6 +7,7 @@ import { instagramHref, tiktokHref, whatsappHref } from "@/lib/contact";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { LogoMark } from "./Logo";
+import { WordmarkText } from "./Wordmark";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteText } from "@/hooks/use-site-settings";
 import { useFilters } from "@/lib/filters";
@@ -39,9 +40,10 @@ export function SiteHeader() {
         <Link to="/" className="flex shrink-0 items-center gap-1">
           <LogoMark className="h-11 shrink-0 sm:h-12" />
           <span className="flex min-w-0 flex-col leading-tight">
-            <span className="font-display text-lg font-semibold tracking-tight sm:text-xl">
-              {t("brand.name")}
-            </span>
+            <WordmarkText
+              nameClassName="text-lg sm:text-xl"
+              captionClassName="hidden text-[10px] sm:block"
+            />
             <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">
               {text("brand.tagline")}
             </span>
@@ -136,7 +138,9 @@ export function SiteFooter() {
         <div className="lg:col-span-2">
           <div className="flex items-center gap-1">
             <LogoMark className="h-12" />
-            <span className="font-display text-xl font-semibold">{t("brand.name")}</span>
+            <span className="flex min-w-0 flex-col leading-tight">
+              <WordmarkText nameClassName="text-xl" captionClassName="text-[11px]" />
+            </span>
           </div>
           <p className="mt-4 max-w-md text-sm text-muted-foreground">{t("footer.tagline")}</p>
         </div>

@@ -20,7 +20,8 @@ export const Route = createFileRoute("/api/public/brand-logo")({
         } catch {
           // The stable fallback remains available even if settings cannot load.
         }
-        return Response.redirect(`${origin}/favicon.png`, 302);
+        // public/favicon.png (the old wheat mark) is kept, unreferenced, for rollback.
+        return Response.redirect(`${origin}/favicon-mark.png`, 302);
       },
     },
   },
