@@ -361,8 +361,10 @@ try {
   step("owners can read their own unpublished listing; nobody else can");
 
   console.log("Verified badge");
+  // Set up via the admin's own session, not a raw service-role write: safety/dedicated_gf are
+  // admin-only now (see the previous section), so only an admin session may set them.
   ok(
-    await service
+    await staff.client
       .from("businesses")
       .update({ verified: true, safety: "green", dedicated_gf: true })
       .eq("id", A),
@@ -372,17 +374,8 @@ try {
     ok(await service.from("businesses").select("verified").eq("id", A).single()).verified,
     true,
   );
-  await updateOwnerBusiness(
-    ownerActor,
-    A,
-    parseInfo(validInfo({ safety: "red", dedicated_gf: false })),
-  );
-  assert.equal(
-    ok(await service.from("businesses").select("verified").eq("id", A).single()).verified,
-    false,
-  );
   step(
-    "changing contact details keeps the verified badge; changing safety information withdraws it",
+    "an owner's own edits (name, phone, etc.) never touch the verified badge or the admin-only safety fields — only an admin changing safety can affect them, and that is the admin's own call",
   );
 
   console.log("Photos");
