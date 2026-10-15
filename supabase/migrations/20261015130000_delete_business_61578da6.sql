@@ -100,26 +100,60 @@ begin
   end if;
 end $$;
 
+-- Every backup table below gets RLS enabled with zero policies right after creation — a plain
+-- CREATE TABLE ... AS SELECT does NOT inherit RLS from the source table, and these tables hold real
+-- business data (billing fields included), so they must not be queryable by anyone via the API.
+-- "enable row level security" with no policy means deny-by-default for every role except the table
+-- owner (never exposed through PostgREST/anon/authenticated). The explicit revoke is defense in
+-- depth in case of any broader default-privilege grant.
+
 create table public._deleted_biz_61578da6 as
   select * from public.businesses where id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_61578da6 enable row level security;
+revoke all on public._deleted_biz_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_links_61578da6 as
   select * from public.business_links where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_links_61578da6 enable row level security;
+revoke all on public._deleted_biz_links_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_branches_61578da6 as
   select * from public.business_branches where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_branches_61578da6 enable row level security;
+revoke all on public._deleted_biz_branches_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_menu_items_61578da6 as
   select * from public.business_menu_items where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_menu_items_61578da6 enable row level security;
+revoke all on public._deleted_biz_menu_items_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_owners_61578da6 as
   select * from public.business_owners where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_owners_61578da6 enable row level security;
+revoke all on public._deleted_biz_owners_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_billing_61578da6 as
   select * from public.business_billing where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_billing_61578da6 enable row level security;
+revoke all on public._deleted_biz_billing_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_subscriptions_61578da6 as
   select * from public.business_subscriptions where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_subscriptions_61578da6 enable row level security;
+revoke all on public._deleted_biz_subscriptions_61578da6 from public, anon, authenticated;
+
 create table public._deleted_biz_favorites_61578da6 as
   select * from public.favorites where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_favorites_61578da6 enable row level security;
+revoke all on public._deleted_biz_favorites_61578da6 from public, anon, authenticated;
+
 -- Not a full backup of these rows (they are not deleted) — just remembers which ones pointed at
--- this business, so the restore script above can re-link them if needed.
+-- this business, so the restore script above can re-link them if needed. No billing/PII data in
+-- this one (just ids), but RLS is enabled anyway for consistency.
 create table public._deleted_biz_analytics_event_ids_61578da6 as
   select id from public.analytics_events where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+alter table public._deleted_biz_analytics_event_ids_61578da6 enable row level security;
+revoke all on public._deleted_biz_analytics_event_ids_61578da6 from public, anon, authenticated;
 
 -- Delete favorites FIRST, while the business row still exists, so favorites_log_analytics' insert
 -- into analytics_events (business_id = the one being removed) is still valid when it fires. The
