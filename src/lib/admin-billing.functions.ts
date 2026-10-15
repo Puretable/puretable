@@ -18,10 +18,14 @@ export type BusinessBillingRow = {
   invoice_status: "sent" | "not_sent";
   invoice_trade_name: string | null;
   invoice_cr_number: string | null;
+  invoice_tax_number: string | null;
   invoice_address: string | null;
   invoice_email: string | null;
   invoice_phone: string | null;
+  invoice_representative_name: string | null;
+  invoice_representative_title: string | null;
   terms_accepted_at: string | null;
+  terms_version: string | null;
   payment_status: "not_required" | "unpaid" | "pending" | "paid" | "failed" | "refunded" | null;
   subscription_status:
     "pending" | "active" | "suspended" | "expired" | "superseded" | "cancelled" | "rejected" | null;

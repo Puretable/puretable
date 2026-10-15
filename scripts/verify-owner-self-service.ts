@@ -8,9 +8,11 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
+  acceptPartnershipAgreement,
   deleteMenuItem,
   deleteOwnerBranch,
   deleteOwnerLink,
+  getFirstLoginAgreement,
   saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
@@ -159,6 +161,26 @@ try {
   const strangerActor = actorFor(stranger);
   const staffActor = actorFor(staff);
   const ownerBActor = actorFor(ownerB);
+
+  console.log("Admin-created business: first-login agreement gate");
+  // Business A here is created directly by an admin-style insert (not the self-signup RPC), with
+  // the owner invited by email — the other real path into the portal. Must behave identically to
+  // self-signup: the agreement is acceptable immediately, with zero billing data saved. This is the
+  // exact path that regressed in production on 2026-10-15 (see agreement-gate.regression.test.ts).
+  const firstLogin = await getFirstLoginAgreement(ownerActor, A, owner.email);
+  assert.match(firstLogin.agreementHtml, /<table/, "agreement HTML is returned");
+  await rejects(
+    getFirstLoginAgreement(strangerActor, A, stranger.email),
+    /Forbidden/,
+    "a stranger cannot load another business's agreement",
+  );
+  ok(await acceptPartnershipAgreement(ownerActor, A, {}));
+  assert.ok(
+    ok(await service.from("businesses").select("terms_accepted_at").eq("id", A).single())
+      .terms_accepted_at,
+    "an admin-created owner can accept the agreement with no billing_business row at all",
+  );
+  step("admin-created owner: agreement loads and is acceptable before any billing data exists");
 
   console.log("Business information");
   const saved = await updateOwnerBusiness(ownerActor, A, parseInfo(validInfo()));
@@ -1128,9 +1150,7 @@ try {
   const minimalSaved = ok(
     await service
       .from("businesses")
-      .select(
-        "business_info_completed, invoice_trade_name, invoice_cr_number, invoice_address, invoice_phone",
-      )
+      .select("business_info_completed")
       .eq("id", newBusinessId)
       .single(),
   );
@@ -1139,9 +1159,16 @@ try {
     true,
     "trade name + CR number alone complete the step — the other fields stay optional",
   );
-  assert.equal(minimalSaved.invoice_trade_name, "QA Signup Biz");
-  assert.equal(minimalSaved.invoice_cr_number, "CR-999");
-  assert.equal(minimalSaved.invoice_address, null, "the deferred fields are never required");
+  const billingSaved = ok(
+    await service
+      .from("business_billing")
+      .select("trade_name, cr_number, address, phone")
+      .eq("business_id", newBusinessId)
+      .single(),
+  );
+  assert.equal(billingSaved.trade_name, "QA Signup Biz");
+  assert.equal(billingSaved.cr_number, "CR-999");
+  assert.equal(billingSaved.address, null, "the deferred fields are never required");
   step("saving just trade name + CR number completes the billing-info gate on its own");
 
   console.log("Premium-for-everyone override while packages are platform-disabled");
@@ -1270,8 +1297,10 @@ try {
   const billingRow = billingRows.find((r) => r.id === A);
   assert.ok(billingRow, "the business appears in the admin billing list");
   assert.equal(billingRow!.invoice_status, "not_sent");
-  // Business A itself never went through accept_partnership_agreement in this script (that's
-  // exercised on newBusinessId above) — check the timestamp on that row instead.
+  assert.ok(
+    billingRow!.terms_accepted_at,
+    "the admin list shows A's agreement acceptance timestamp",
+  );
   assert.ok(
     billingRows.find((r) => r.id === newBusinessId)?.terms_accepted_at,
     "the admin list shows the agreement acceptance timestamp",

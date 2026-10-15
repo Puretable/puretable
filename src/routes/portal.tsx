@@ -28,6 +28,7 @@ import { SubscriptionHistory } from "@/components/portal/SubscriptionHistory";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteText } from "@/hooks/use-site-settings";
 import { getOwnerHistory, getOwnerOverview, listPlanCatalog } from "@/lib/owner-portal.functions";
+import { AGREEMENT_TERMS_VERSION } from "@/lib/owner-manage.schemas";
 import {
   STATUS_LABELS,
   daysRemaining,
@@ -172,7 +173,7 @@ function OwnerDashboard({ userId, email }: { userId: string; email: string }) {
       </section>
     );
 
-  if (!business.terms_accepted_at)
+  if (!business.terms_accepted_at || business.terms_version !== AGREEMENT_TERMS_VERSION)
     return (
       <section dir="rtl" className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         {header}

@@ -72,6 +72,20 @@ function friendlyDbError(message: string): string {
   return message;
 }
 
+/**
+ * The first-login agreement path can only fail with a small, known set of messages (Forbidden,
+ * Access suspended, Business not found) — anything else is unexpected and must never reach the
+ * client verbatim (it could be a raw Postgres error). Unexpected errors are logged here with a
+ * short reference id (no business/user data, just the error text) so they can be found in server
+ * logs from the id shown to the owner, instead of being silently swallowed by a generic message.
+ */
+function agreementError(tag: string, message: string): Error {
+  if (/^(Forbidden|Access suspended|Business not found)$/.test(message)) return new Error(message);
+  const ref = crypto.randomUUID().slice(0, 8);
+  console.error(`[agreement:${tag}:${ref}]`, message);
+  return new Error(`Unexpected error (ref ${ref})`);
+}
+
 function unique(list: string[]): string[] {
   return Array.from(new Set(list));
 }
@@ -181,13 +195,17 @@ export async function getFirstLoginAgreement(
   businessId: string,
   email: string | null,
 ) {
-  await requireOwnerAccess(actor, businessId);
+  try {
+    await requireOwnerAccess(actor, businessId);
+  } catch (e) {
+    throw agreementError("load", e instanceof Error ? e.message : "requireOwnerAccess failed");
+  }
   const { data: row, error } = await actor.adminClient
     .from("businesses")
     .select("name")
     .eq("id", businessId)
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throw agreementError("load", error.message);
   return { agreementHtml: fillAgreementTemplate({ tradeName: row.name, email }) };
 }
 
@@ -201,7 +219,7 @@ export async function acceptPartnershipAgreement(
     _business_id: businessId,
     _terms_version: AGREEMENT_TERMS_VERSION,
   });
-  if (error) throw new Error(friendlyDbError(error.message));
+  if (error) throw agreementError("accept", error.message);
   return { ok: true as const };
 }
 

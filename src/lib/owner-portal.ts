@@ -51,6 +51,7 @@ export type OwnerBusiness = {
   cover_url: string | null;
   business_info_completed: boolean;
   terms_accepted_at: string | null;
+  terms_version: string | null;
   entitlements: {
     branch_limit: number | null;
     photo_limit: number;
@@ -260,10 +261,15 @@ const MESSAGES: [pattern: RegExp, message: string][] = [
   [/already suspended/i, "الوصول معلّق بالفعل."],
   [/not suspended/i, "الوصول غير معلّق."],
   [/no current subscription/i, "لا يوجد اشتراك حالي لتعليقه."],
+  [/^Business not found$/i, "لم يتم العثور على المنشأة. أعد تحميل الصفحة أو تواصل معنا."],
 ];
 
 /** Turns database/server errors into a short Arabic message; never leaks internals. */
 export function friendlyPortalError(error: unknown): string {
   const text = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  // Unexpected agreement-path errors carry a short reference id (see agreementError in
+  // owner-manage.server.ts) so the owner can report it and it can be found in server logs.
+  const ref = text.match(/^Unexpected error \(ref ([\w-]+)\)$/i);
+  if (ref) return `حدث خطأ غير متوقع. يرجى إبلاغ الدعم بهذا الرقم: ${ref[1]}`;
   return MESSAGES.find(([pattern]) => pattern.test(text))?.[1] ?? "تعذر إكمال الطلب. حاول مجدداً.";
 }

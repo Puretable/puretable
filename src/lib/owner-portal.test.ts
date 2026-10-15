@@ -23,6 +23,7 @@ const business = (over: Partial<OwnerBusiness> = {}): OwnerBusiness => ({
   cover_url: null,
   business_info_completed: true,
   terms_accepted_at: "2026-01-01T00:00:00Z",
+  terms_version: "v1",
   entitlements: {
     branch_limit: 1,
     photo_limit: 1,
@@ -132,5 +133,10 @@ test("errors are mapped to safe Arabic messages", () => {
   assert.equal(
     friendlyPortalError(new Error("connection to 10.0.0.1 refused")),
     "تعذر إكمال الطلب. حاول مجدداً.",
+  );
+  assert.match(friendlyPortalError(new Error("Business not found")), /لم يتم العثور/);
+  assert.equal(
+    friendlyPortalError(new Error("Unexpected error (ref ab12cd34)")),
+    "حدث خطأ غير متوقع. يرجى إبلاغ الدعم بهذا الرقم: ab12cd34",
   );
 });
