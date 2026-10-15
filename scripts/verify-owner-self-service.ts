@@ -1315,8 +1315,8 @@ try {
   );
   ok(await staff.client.rpc("admin_set_invoice_status", { _business_id: A, _status: "sent" }));
   assert.equal(
-    ok(await service.from("businesses").select("invoice_status").eq("id", A).single())
-      .invoice_status,
+    ok(await service.from("business_billing").select("status").eq("business_id", A).single())
+      .status,
     "sent",
   );
   step("the admin invoice toggle saves immediately and is admin-only");
