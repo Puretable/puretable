@@ -3,7 +3,6 @@ import {
   assertAllowedPhotoUrls,
   assertPhotoLimit,
   ownerUploadPrefix,
-  safetyFieldsChanged,
   AGREEMENT_TERMS_VERSION,
   type AcceptAgreementInput,
   type BillingFieldsInput,
@@ -98,7 +97,7 @@ export async function updateOwnerBusiness(
   await requireOwnerAccess(actor, businessId);
   const { data: current, error: readError } = await actor.adminClient
     .from("businesses")
-    .select("id, safety, shared_kitchen, dedicated_gf, verified")
+    .select("id, safety, shared_kitchen, dedicated_gf, precautions_note, verified")
     .eq("id", businessId)
     .single();
   if (readError || !current) throw new Error("Forbidden");
@@ -106,10 +105,15 @@ export async function updateOwnerBusiness(
   const payload: Record<string, unknown> = {
     ...input,
     discount_code: input.discount_code?.trim() || null,
+    // Safety level, shared-kitchen status, its note, and the dedicated-kitchen flag are admin-only:
+    // set only from the admin pages. The portal form no longer submits these as editable, but this
+    // pins them to the business's current stored values regardless of what the request body
+    // contains, so a crafted call to this server function can't change them either.
+    safety: current.safety,
+    shared_kitchen: current.shared_kitchen,
+    precautions_note: current.precautions_note,
+    dedicated_gf: current.dedicated_gf,
   };
-  // Safety wording is the owner's responsibility, but an admin's "verified" badge vouches for the
-  // information as it was reviewed, so it is withdrawn whenever that information changes.
-  if (current.verified && safetyFieldsChanged(current, input)) payload["verified"] = false;
 
   // column-grant-safe: adminClient is the service-role client, which bypasses grants entirely.
   const { data, error } = await actor.adminClient

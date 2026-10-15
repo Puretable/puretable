@@ -18,6 +18,7 @@ import { SITE_SETTINGS_KEY } from "@/hooks/use-site-settings";
 import { useEffect, type ReactNode } from "react";
 import { useLogoUrl } from "@/hooks/use-logo-url";
 import { DEFAULT_LOGO_URL } from "@/lib/brand";
+import { OG_IMAGE } from "@/lib/seo";
 
 import appCss from "../styles.css?url";
 import { LanguageProvider } from "../lib/i18n/LanguageProvider";
@@ -110,8 +111,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Discover trusted restaurants, cafes, bakeries, and home businesses offering safe gluten-free options across Saudi Arabia.",
       },
-      { property: "og:image", content: "/og-pure-table.jpg" },
-      { name: "twitter:image", content: "/og-pure-table.jpg" },
+      // Every content route also spreads ogImageMeta() in its own head(), which sets
+      // og:image:width/height/alt correctly for that page (present only for the default branded
+      // image, omitted for a business's own cover photo, whose dimensions aren't known). Deliberately
+      // not declaring width/height/alt here: TanStack Router merges meta by key across the route
+      // tree, so a value set here would leak into pages that override og:image to a different,
+      // differently-sized image without a matching key to clear it.
+      { property: "og:image", content: OG_IMAGE },
+      { name: "twitter:image", content: OG_IMAGE },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

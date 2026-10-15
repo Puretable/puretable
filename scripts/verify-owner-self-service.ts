@@ -204,6 +204,52 @@ try {
   });
   step("owner edits their listing; plan, slug, publish state and category stay untouched");
 
+  console.log("Safety level and the shared-kitchen note are admin-only");
+  const beforeSafety = ok(
+    await service
+      .from("businesses")
+      .select("safety, shared_kitchen, precautions_note, dedicated_gf")
+      .eq("id", A)
+      .single(),
+  );
+  const crafted = await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        safety: beforeSafety.safety === "green" ? "red" : "green",
+        shared_kitchen: !beforeSafety.shared_kitchen,
+        precautions_note: "hijacked note",
+      }),
+    ),
+  );
+  assert.equal(crafted.safety, beforeSafety.safety);
+  assert.equal(crafted.shared_kitchen, beforeSafety.shared_kitchen);
+  assert.equal(crafted.precautions_note, beforeSafety.precautions_note);
+  assert.equal(crafted.dedicated_gf, beforeSafety.dedicated_gf);
+  step(
+    "the owner's save endpoint ignores any safety / shared-kitchen / note / dedicated-kitchen value it is sent, even in a crafted request",
+  );
+
+  await rejects(
+    (async () => ok(await service.from("businesses").update({ safety: "none" }).eq("id", A)))(),
+    /Only an admin may change/,
+    "raw service-role write to safety",
+  );
+  step(
+    "the database itself rejects any change to these fields unless the session is an admin (defense in depth, independent of application code)",
+  );
+
+  ok(await staff.client.from("businesses").update({ safety: "none" }).eq("id", A));
+  assert.equal(
+    ok(await service.from("businesses").select("safety").eq("id", A).single()).safety,
+    "none",
+  );
+  ok(await staff.client.from("businesses").update({ safety: beforeSafety.safety }).eq("id", A));
+  step(
+    "an admin's own authenticated session can still change safety level — the admin page keeps working",
+  );
+
   console.log("Tenant isolation");
   await rejects(
     updateOwnerBusiness(ownerActor, B, parseInfo(validInfo({ name: "Hijacked" }))),
