@@ -4,13 +4,30 @@
 -- data deletion, scoped to a single id, run as one transaction so it either fully applies or not at
 -- all. No other business is touched.
 --
+-- REVISION 2 — the first run of this file failed and rolled back cleanly (nothing was deleted,
+-- including the backup tables — a failed transaction undoes everything in it, so there was nothing
+-- to clean up before re-running). Error was:
+--   23503 foreign key violation on analytics_events, raised from the trigger
+--   favorites_log_analytics (after delete on public.favorites).
+-- Root cause: favorites.business_id is ON DELETE CASCADE, so deleting the business cascades into
+-- deleting its favorites rows; that delete fires favorites_log_analytics, which tries to insert a
+-- 'favorite_remove' analytics_events row referencing business_id — but by then, mid-cascade, the
+-- business row is already gone, so that insert violates analytics_events' own foreign key.
+-- This affects EVERY business that has at least one favorite, not just this one — see the separate
+-- migration 20261015140000_admin_delete_business_function.sql, which fixes this for the admin UI's
+-- delete button going forward. The trigger itself is untouched and still fires normally — this file
+-- just deletes this business's favorites explicitly, one step earlier, while the business row still
+-- exists, so the trigger's insert is always valid. No other trigger in this schema has the same
+-- after-delete-insert-referencing-business_id shape (checked every trigger in every migration file).
+--
 -- Arabic summary / ملخص بالعربي:
 -- هذا الملف يحذف منشأة واحدة فقط (المعرّف أعلاه) وكل البيانات المرتبطة بها (الأصناف، الروابط،
--- الفروع، الملاك، بيانات الفوترة، الاشتراكات). قبل الحذف يأخذ نسخة احتياطية كاملة من كل هذه
--- البيانات داخل جداول مؤقتة في نفس قاعدة البيانات، بحيث يمكن التراجع الكامل لاحقًا إن لزم. لا تُحذف
--- أي منشأة أخرى. أحداث التحليلات (analytics_events) المرتبطة بهذه المنشأة لا تُحذف — فقط يُزال
--- ربطها بالمنشأة (business_id يصبح فارغًا)، وهذا هو التصميم الأصلي لقاعدة البيانات حتى تبقى
--- الإحصاءات التاريخية متاحة حتى بعد حذف منشأة.
+-- الفروع، الملاك، بيانات الفوترة، الاشتراكات، المفضّلات). قبل الحذف يأخذ نسخة احتياطية كاملة من كل
+-- هذه البيانات داخل جداول مؤقتة في نفس قاعدة البيانات، بحيث يمكن التراجع الكامل لاحقًا إن لزم. لا
+-- تُحذف أي منشأة أخرى. المحاولة الأولى فشلت بسبب خطأ في قاعدة البيانات (trigger يحاول تسجيل حدث
+-- إحصائي لمنشأة حُذفت للتو) — تم إصلاحه هنا بحذف المفضّلات أولاً، قبل حذف المنشأة، بنفس الصلاحيات،
+-- دون تعطيل أي trigger. أحداث التحليلات (analytics_events) المرتبطة بهذه المنشأة لا تُحذف — فقط
+-- يُزال ربطها بالمنشأة، وهذا هو التصميم الأصلي لقاعدة البيانات.
 
 -- ============================================================================
 -- RESTORE SCRIPT — shown first, ready if you ever need to undo this deletion.
@@ -49,6 +66,10 @@ insert into public.business_subscriptions
   select * from public._deleted_biz_subscriptions_61578da6
   on conflict (id) do nothing;
 
+insert into public.favorites
+  select * from public._deleted_biz_favorites_61578da6
+  on conflict (id) do nothing;
+
 -- Re-links any analytics_events that were pointed at this business before deletion (they were never
 -- deleted, only unlinked — this just restores the business_id on the ones that had it).
 update public.analytics_events
@@ -61,7 +82,8 @@ commit;
 -- drop table public._deleted_biz_61578da6, public._deleted_biz_links_61578da6,
 --   public._deleted_biz_branches_61578da6, public._deleted_biz_menu_items_61578da6,
 --   public._deleted_biz_owners_61578da6, public._deleted_biz_billing_61578da6,
---   public._deleted_biz_subscriptions_61578da6, public._deleted_biz_analytics_event_ids_61578da6;
+--   public._deleted_biz_subscriptions_61578da6, public._deleted_biz_favorites_61578da6,
+--   public._deleted_biz_analytics_event_ids_61578da6;
 */
 
 -- ============================================================================
@@ -92,14 +114,21 @@ create table public._deleted_biz_billing_61578da6 as
   select * from public.business_billing where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
 create table public._deleted_biz_subscriptions_61578da6 as
   select * from public.business_subscriptions where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+create table public._deleted_biz_favorites_61578da6 as
+  select * from public.favorites where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
 -- Not a full backup of these rows (they are not deleted) — just remembers which ones pointed at
 -- this business, so the restore script above can re-link them if needed.
 create table public._deleted_biz_analytics_event_ids_61578da6 as
   select id from public.analytics_events where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
 
--- The delete itself. Every dependent table's business_id foreign key is ON DELETE CASCADE except
--- analytics_events, which is ON DELETE SET NULL by design (keeps historical stats after a business
--- is removed) — both are handled automatically by Postgres, no separate delete statements needed.
+-- Delete favorites FIRST, while the business row still exists, so favorites_log_analytics' insert
+-- into analytics_events (business_id = the one being removed) is still valid when it fires. The
+-- trigger is not touched or disabled — this just makes sure it never runs after the business is gone.
+delete from public.favorites where business_id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
+
+-- The business itself. Every remaining dependent table's business_id foreign key is ON DELETE
+-- CASCADE except analytics_events, which is ON DELETE SET NULL by design (keeps historical stats
+-- after a business is removed) — both are handled automatically by Postgres.
 delete from public.businesses where id = '61578da6-ac38-4f49-8618-11e4ea54fe8c';
 
 commit;

@@ -125,7 +125,15 @@ export const deleteBusiness = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { error } = await context.supabase.from("businesses").delete().eq("id", data.id);
+    // admin_delete_business (SECURITY DEFINER) deletes every user's favorites for this business
+    // before deleting the business itself, in one server-side transaction — a plain client-side
+    // `.from("favorites").delete()` can't do this: RLS only lets a session delete its OWN favorites,
+    // not other users' favorites for a given business, and leaving any behind would hit the same
+    // favorites_log_analytics trigger failure this function exists to avoid. See
+    // supabase/migrations/20261015140000_admin_delete_business_function.sql.
+    const { error } = await context.supabase.rpc("admin_delete_business", {
+      _business_id: data.id,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });

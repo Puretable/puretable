@@ -952,6 +952,10 @@ export type Database = {
         Args: { _business_id: string; _status: string };
         Returns: undefined;
       };
+      admin_delete_business: {
+        Args: { _business_id: string };
+        Returns: undefined;
+      };
       save_business_billing_fields: {
         Args: {
           _business_id: string;
