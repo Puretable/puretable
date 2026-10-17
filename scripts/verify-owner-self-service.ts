@@ -204,50 +204,84 @@ try {
   });
   step("owner edits their listing; plan, slug, publish state and category stay untouched");
 
-  console.log("Safety level and the shared-kitchen note are admin-only");
-  const beforeSafety = ok(
+  console.log("Safety level stays owner-editable; the shared-kitchen note is admin-only");
+  const beforeNote = ok(
     await service
       .from("businesses")
       .select("safety, shared_kitchen, precautions_note, dedicated_gf")
       .eq("id", A)
       .single(),
   );
+
+  const ownerChanged = await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        safety: beforeNote.safety === "green" ? "red" : "green",
+        shared_kitchen: !beforeNote.shared_kitchen,
+      }),
+    ),
+  );
+  assert.notEqual(ownerChanged.safety, beforeNote.safety);
+  assert.equal(ownerChanged.shared_kitchen, !beforeNote.shared_kitchen);
+  step("an owner can change their own safety level and shared-kitchen status, as before");
+
   const crafted = await updateOwnerBusiness(
     ownerActor,
     A,
     parseInfo(
       validInfo({
-        safety: beforeSafety.safety === "green" ? "red" : "green",
-        shared_kitchen: !beforeSafety.shared_kitchen,
+        safety: ownerChanged.safety,
+        shared_kitchen: ownerChanged.shared_kitchen,
         precautions_note: "hijacked note",
       }),
     ),
   );
-  assert.equal(crafted.safety, beforeSafety.safety);
-  assert.equal(crafted.shared_kitchen, beforeSafety.shared_kitchen);
-  assert.equal(crafted.precautions_note, beforeSafety.precautions_note);
-  assert.equal(crafted.dedicated_gf, beforeSafety.dedicated_gf);
+  assert.equal(crafted.precautions_note, beforeNote.precautions_note);
   step(
-    "the owner's save endpoint ignores any safety / shared-kitchen / note / dedicated-kitchen value it is sent, even in a crafted request",
+    "the owner's save endpoint ignores any shared-kitchen note value it is sent, even in a crafted request",
   );
 
   await rejects(
-    (async () => ok(await service.from("businesses").update({ safety: "none" }).eq("id", A)))(),
-    /Only an admin may change/,
-    "raw service-role write to safety",
+    (async () =>
+      ok(
+        await service.from("businesses").update({ precautions_note: "raw hijack" }).eq("id", A),
+      ))(),
+    /Only an admin may change the shared-kitchen note/,
+    "raw service-role write to precautions_note",
   );
   step(
-    "the database itself rejects any change to these fields unless the session is an admin (defense in depth, independent of application code)",
+    "the database itself rejects any change to the shared-kitchen note unless the session is an admin",
   );
 
-  ok(await staff.client.from("businesses").update({ safety: "none" }).eq("id", A));
-  assert.equal(
-    ok(await service.from("businesses").select("safety").eq("id", A).single()).safety,
-    "none",
+  ok(await service.from("businesses").update({ safety: "none" }).eq("id", A));
+  step("a raw write to the safety level itself (not the note) is not restricted by this trigger");
+
+  await rejects(
+    updateOwnerBusiness(ownerBActor, A, parseInfo(validInfo({ safety: "green" }))),
+    /Forbidden/,
+    "another business's owner changing A's safety/note",
   );
-  ok(await staff.client.from("businesses").update({ safety: beforeSafety.safety }).eq("id", A));
-  step(
-    "an admin's own authenticated session can still change safety level — the admin page keeps working",
+  step("another business's owner cannot change this business's safety level or note at all");
+
+  ok(await staff.client.from("businesses").update({ precautions_note: "admin note" }).eq("id", A));
+  assert.equal(
+    ok(await service.from("businesses").select("precautions_note").eq("id", A).single())
+      .precautions_note,
+    "admin note",
+  );
+  step("an admin's own authenticated session can still edit the shared-kitchen note");
+
+  ok(
+    await staff.client
+      .from("businesses")
+      .update({
+        safety: beforeNote.safety,
+        shared_kitchen: beforeNote.shared_kitchen,
+        precautions_note: beforeNote.precautions_note,
+      })
+      .eq("id", A),
   );
 
   console.log("Tenant isolation");
@@ -361,10 +395,8 @@ try {
   step("owners can read their own unpublished listing; nobody else can");
 
   console.log("Verified badge");
-  // Set up via the admin's own session, not a raw service-role write: safety/dedicated_gf are
-  // admin-only now (see the previous section), so only an admin session may set them.
   ok(
-    await staff.client
+    await service
       .from("businesses")
       .update({ verified: true, safety: "green", dedicated_gf: true })
       .eq("id", A),
@@ -374,8 +406,17 @@ try {
     ok(await service.from("businesses").select("verified").eq("id", A).single()).verified,
     true,
   );
+  await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(validInfo({ safety: "red", dedicated_gf: false })),
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("verified").eq("id", A).single()).verified,
+    false,
+  );
   step(
-    "an owner's own edits (name, phone, etc.) never touch the verified badge or the admin-only safety fields — only an admin changing safety can affect them, and that is the admin's own call",
+    "changing contact details keeps the verified badge; changing safety information withdraws it",
   );
 
   console.log("Photos");

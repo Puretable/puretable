@@ -1,8 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { LocationPicker } from "@/components/admin/LocationPicker";
-import { SafetyNote } from "@/components/site/SafetyBadge";
-import { DAY_KEYS, OwnerBusinessInput, type OwnerBusinessDetail } from "@/lib/owner-manage.schemas";
+import { useSiteText } from "@/hooks/use-site-settings";
+import {
+  DAY_KEYS,
+  OwnerBusinessInput,
+  safetyFieldsChanged,
+  type OwnerBusinessDetail,
+} from "@/lib/owner-manage.schemas";
 import { friendlyPortalError } from "@/lib/owner-portal";
 
 const DAY_LABELS: Record<(typeof DAY_KEYS)[number], string> = {
@@ -25,6 +30,8 @@ const FIELD_LABELS: Record<string, string> = {
   description: "الوصف",
   address: "العنوان",
 };
+
+type SafetyLevel = "green" | "red" | "none";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -59,6 +66,7 @@ export function BusinessInfoForm({
   save: (input: OwnerBusinessInput) => Promise<unknown>;
   disabled?: boolean;
 }) {
+  const { text } = useSiteText();
   const s = (v: string | null | undefined) => v ?? "";
   const [f, setF] = useState({
     name: business.name,
@@ -82,6 +90,9 @@ export function BusinessInfoForm({
     lat: business.lat,
     lng: business.lng,
     no_location: business.no_location,
+    safety: business.safety as SafetyLevel,
+    shared_kitchen: business.shared_kitchen,
+    dedicated_gf: business.dedicated_gf,
     hours: { ...business.hours } as Record<string, string>,
   });
   const [busy, setBusy] = useState(false);
@@ -119,12 +130,12 @@ export function BusinessInfoForm({
       hours: Object.fromEntries(Object.entries(f.hours).filter(([, v]) => v.trim() !== "")),
       discount_code: f.discount_code,
       no_location: f.no_location,
-      // Safety level, shared-kitchen status and its note are admin-only (set from the admin pages)
-      // — the owner can view them below but not change them, so these are always passed through
-      // unchanged from the business's current values, never from editable form state.
-      safety: business.safety,
-      shared_kitchen: business.shared_kitchen,
-      dedicated_gf: business.dedicated_gf,
+      safety: f.safety,
+      shared_kitchen: f.shared_kitchen,
+      dedicated_gf: f.dedicated_gf,
+      // The shared-kitchen note is admin-only (set from the admin pages) — the owner can see it
+      // below but not change it, so it is always passed through unchanged from the business's
+      // current stored value, never from editable form state.
       precautions_note: business.precautions_note,
     });
     if (!parsed.success) {
@@ -136,6 +147,14 @@ export function BusinessInfoForm({
       );
       return;
     }
+    if (
+      business.verified &&
+      safetyFieldsChanged(business, parsed.data) &&
+      !window.confirm(
+        "تغيير معلومات السلامة سيسحب شارة «موثّق» من صفحتك حتى تراجعها الإدارة من جديد. هل تريد المتابعة؟",
+      )
+    )
+      return;
     setBusy(true);
     setErrors([]);
     try {
@@ -158,6 +177,29 @@ export function BusinessInfoForm({
       setBusy(false);
     }
   }
+
+  const safetyOption = (
+    level: SafetyLevel,
+    dot: string,
+    active: string,
+    label: string,
+    desc: string,
+  ) => (
+    <button
+      key={level}
+      type="button"
+      role="radio"
+      aria-checked={f.safety === level}
+      onClick={() => set("safety", level)}
+      className={`flex items-start gap-2 rounded-xl border p-3 text-start text-sm ${f.safety === level ? active : "border-border"}`}
+    >
+      <span className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+      <span>
+        <span className="block font-medium">{label}</span>
+        <span className="block text-xs text-muted-foreground">{desc}</span>
+      </span>
+    </button>
+  );
 
   return (
     <form onSubmit={submit} className="space-y-6" noValidate>
@@ -229,16 +271,61 @@ export function BusinessInfoForm({
           </div>
         </Card>
 
-        <Card title="مستوى الأمان">
+        <Card title="مستوى الأمان (كما تصرّح به المنشأة)">
+          <div
+            role="radiogroup"
+            aria-label="مستوى الأمان"
+            className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            {safetyOption(
+              "green",
+              "bg-safety-safe",
+              "border-safety-safe bg-safety-safe/10",
+              text("safety.safe_label"),
+              text("safety.safe_desc"),
+            )}
+            {safetyOption(
+              "red",
+              "bg-safety-caution",
+              "border-safety-caution bg-safety-caution/10",
+              text("safety.caution_label"),
+              text("safety.caution_desc"),
+            )}
+            <button
+              type="button"
+              aria-pressed={f.shared_kitchen}
+              onClick={() => set("shared_kitchen", !f.shared_kitchen)}
+              className={`flex items-start gap-2 rounded-xl border p-3 text-start text-sm ${f.shared_kitchen ? "border-safety-shared bg-safety-shared/10" : "border-border"}`}
+            >
+              <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-shared" />
+              <span>
+                <span className="block font-medium">{text("safety.shared_label")}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {text("safety.shared_desc")}
+                </span>
+              </span>
+            </button>
+            {safetyOption(
+              "none",
+              "border border-muted-foreground",
+              "border-foreground bg-secondary",
+              "بدون تقييم",
+              "لا تظهر أي نقطة على صفحتك.",
+            )}
+          </div>
+          {f.shared_kitchen && (
+            <Field label="نص المطبخ المشترك (يظهر للزائر)">
+              <p className="mt-2 rounded-xl border bg-secondary/40 p-3 text-sm text-muted-foreground">
+                {business.precautions_note?.trim() || "لم تُدخل الإدارة نصاً بعد."}
+              </p>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                هذا النص تحدّده إدارة Pure Table فقط — تواصل معنا إن احتجت تعديله.
+              </span>
+            </Field>
+          )}
           <p className="text-xs text-muted-foreground">
-            يحدَّد مستوى الأمان ونص المطبخ المشترك من قِبل إدارة Pure Table فقط. هذا هو المعروض
-            حالياً على صفحتك — تواصل معنا إن احتجت تعديله.
+            هذه المعلومة مقدَّمة من المنشأة ولا تتحقق منها Pure Table. تأكد من دقتها.
           </p>
-          <SafetyNote
-            level={business.safety}
-            sharedKitchen={business.shared_kitchen}
-            precautionsNote={business.precautions_note}
-          />
         </Card>
 
         <Card title="التواصل">
