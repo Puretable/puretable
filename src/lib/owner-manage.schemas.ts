@@ -41,66 +41,6 @@ export function toHttpUrl(value: string): string | null {
   }
 }
 
-const httpUrl = (max = 2000) =>
-  z.preprocess(
-    emptyToNull,
-    z
-      .string()
-      .trim()
-      .max(max)
-      .transform((v, ctx) => {
-        const url = toHttpUrl(v);
-        if (!url) {
-          ctx.addIssue({
-            code: "custom",
-            message: "الرابط غير صالح — الصق رابطاً يبدأ بـ https://",
-          });
-          return z.NEVER;
-        }
-        return url;
-      })
-      .nullable()
-      .optional(),
-  );
-
-const phone = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .regex(/^[+0-9 ()\-./]{5,40}$/, "رقم الهاتف غير صالح")
-    .nullable()
-    .optional(),
-);
-/** A WhatsApp number, or a link. */
-const whatsapp = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .max(300)
-    .refine(
-      (v) => /^[+0-9 ()-]{8,30}$/.test(v) || toHttpUrl(v) !== null,
-      "رقم واتساب أو رابط غير صالح",
-    )
-    .nullable()
-    .optional(),
-);
-/** An Instagram handle (with or without @) or a link. */
-const instagram = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .max(300)
-    .refine(
-      (v) => /^@?[A-Za-z0-9._]{1,30}$/.test(v) || toHttpUrl(v) !== null,
-      "حساب إنستغرام غير صالح",
-    )
-    .nullable()
-    .optional(),
-);
-
 const hours = z
   .record(z.string(), z.string().trim().max(60).regex(PLAIN))
   .refine(
@@ -148,11 +88,9 @@ export const OwnerBusinessInput = z.object({
   address_ar: opt(300),
   lat: z.number().min(-90).max(90).nullable().optional(),
   lng: z.number().min(-180).max(180).nullable().optional(),
-  phone,
-  whatsapp,
-  instagram,
-  website: httpUrl(),
-  maps_url: httpUrl(),
+  // phone/whatsapp/maps_url are branch-level now (see OwnerBranchInput); website/instagram/tiktok/
+  // email are the shared business-level contact fields (see BusinessContactInput) — all live in the
+  // portal's "التواصل والطلب" tab now, not here, so there is exactly one place to edit each.
   hours,
   // `offers_booking` is deliberately absent: it is tied to admin-managed categories.
   discount_code: opt(80),
@@ -184,9 +122,8 @@ export const OwnerBranchInput = BranchInput.omit({ plan_limited: true }).extend(
   district: opt(100),
   district_ar: opt(100),
   region: opt(100),
-  phone,
-  whatsapp,
-  maps_url: httpUrl(),
+  // phone/whatsapp/maps_url inherit BranchInput's normalizing validators (phoneField/httpsUrlField)
+  // — deliberately not overridden here.
   hours: hours.default({}),
   sort_order: z.number().int().min(0).max(10000).default(0),
 });

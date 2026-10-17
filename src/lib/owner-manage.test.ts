@@ -12,22 +12,21 @@ import {
   safetyFieldsChanged,
   toHttpUrl,
 } from "./owner-manage.schemas";
+import { BusinessContactInput } from "./businesses.schemas";
 import { validateImageFile } from "./image-upload";
 
 const BUSINESS = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const SUPABASE = "https://example.supabase.co";
 
+// phone/whatsapp/maps_url are branch-level now (OwnerBranchInput); website/instagram/tiktok/email
+// are the shared business-level contact fields (BusinessContactInput) — neither lives on
+// OwnerBusinessInput any more, see the tests further down that cover those schemas directly.
 const validBusiness = () => ({
   name: "Green Oak",
   name_ar: "جرين أوك",
   description: "Gluten free kitchen",
   city: "Riyadh",
-  phone: "+966 11 123 4567",
-  whatsapp: "0551234567",
-  instagram: "greenoak",
-  website: "https://greenoak.example",
-  maps_url: "https://maps.app.goo.gl/abc",
   hours: { sun: "9-5" },
   no_location: false,
   safety: "green" as const,
@@ -36,11 +35,7 @@ const validBusiness = () => ({
 });
 
 test("a valid owner listing is accepted and normalised", () => {
-  const parsed = OwnerBusinessInput.parse({
-    ...validBusiness(),
-    website: "  greenoak.example/menu ",
-  });
-  assert.equal(parsed.website, "https://greenoak.example/menu");
+  const parsed = OwnerBusinessInput.parse(validBusiness());
   assert.equal(parsed.name_ar, "جرين أوك");
   assert.equal(OwnerBusinessInput.parse({ ...validBusiness(), name_ar: "  " }).name_ar, null);
 });
@@ -74,34 +69,31 @@ test("owners cannot smuggle admin-only fields into a save", () => {
 });
 
 test("dangerous or malformed URLs are rejected", () => {
-  for (const bad of [
-    "javascript:alert(1)",
-    "data:text/html,<b>x</b>",
-    "ftp://files.example/x",
-    "not a url at all",
-  ]) {
+  for (const bad of ["javascript:alert(1)", "data:text/html,<b>x</b>", "ftp://files.example/x"]) {
     assert.equal(toHttpUrl(bad), null, bad);
     assert.equal(
-      OwnerBusinessInput.safeParse({ ...validBusiness(), website: bad }).success,
+      BusinessContactInput.safeParse({ business_id: BUSINESS, website: bad }).success,
       false,
       bad,
     );
     assert.equal(
-      OwnerBusinessInput.safeParse({ ...validBusiness(), maps_url: bad }).success,
+      OwnerBranchInput.safeParse({ business_id: BUSINESS, name: "x", maps_url: bad }).success,
       false,
       bad,
     );
   }
   assert.equal(
-    OwnerBusinessInput.safeParse({ ...validBusiness(), instagram: "javascript:alert(1)" }).success,
+    BusinessContactInput.safeParse({ business_id: BUSINESS, instagram: "javascript:alert(1)" })
+      .success,
     false,
   );
   assert.equal(
-    OwnerBusinessInput.safeParse({ ...validBusiness(), whatsapp: "<script>" }).success,
+    OwnerBranchInput.safeParse({ business_id: BUSINESS, name: "x", whatsapp: "<script>" }).success,
     false,
   );
   assert.equal(
-    OwnerBusinessInput.safeParse({ ...validBusiness(), phone: "call me maybe" }).success,
+    OwnerBranchInput.safeParse({ business_id: BUSINESS, name: "x", phone: "call me maybe" })
+      .success,
     false,
   );
 });

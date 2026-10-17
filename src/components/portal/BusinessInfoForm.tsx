@@ -81,11 +81,6 @@ export function BusinessInfoForm({
     district_ar: s(business.district_ar),
     address: s(business.address),
     address_ar: s(business.address_ar),
-    phone: s(business.phone),
-    whatsapp: s(business.whatsapp),
-    instagram: s(business.instagram),
-    website: s(business.website),
-    maps_url: s(business.maps_url),
     discount_code: s(business.discount_code),
     lat: business.lat,
     lng: business.lng,
@@ -122,11 +117,6 @@ export function BusinessInfoForm({
       address_ar: f.address_ar,
       lat: f.lat,
       lng: f.lng,
-      phone: f.phone,
-      whatsapp: f.whatsapp,
-      instagram: f.instagram,
-      website: f.website,
-      maps_url: f.maps_url,
       hours: Object.fromEntries(Object.entries(f.hours).filter(([, v]) => v.trim() !== "")),
       discount_code: f.discount_code,
       no_location: f.no_location,
@@ -159,17 +149,9 @@ export function BusinessInfoForm({
     setErrors([]);
     try {
       await save(parsed.data);
-      // Show the values exactly as stored (links are normalised to https:// and text is trimmed).
+      // Show the value exactly as stored (text is trimmed).
       const stored = parsed.data;
-      setF((prev) => ({
-        ...prev,
-        name: stored.name,
-        phone: stored.phone ?? "",
-        whatsapp: stored.whatsapp ?? "",
-        instagram: stored.instagram ?? "",
-        website: stored.website ?? "",
-        maps_url: stored.maps_url ?? "",
-      }));
+      setF((prev) => ({ ...prev, name: stored.name }));
       setMessage("تم حفظ بيانات العمل.");
     } catch (e) {
       setErrors([friendlyPortalError(e)]);
@@ -329,45 +311,11 @@ export function BusinessInfoForm({
         </Card>
 
         <Card title="التواصل">
+          <p className="text-xs text-muted-foreground">
+            الهاتف وواتساب والموقع الإلكتروني وإنستغرام وتيك توك والبريد الإلكتروني ومابس وخيارات
+            الاستلام والتوصيل انتقلت إلى تبويب «التواصل والطلب».
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="الهاتف">
-              <input
-                dir="ltr"
-                inputMode="tel"
-                maxLength={40}
-                value={f.phone}
-                onChange={(e) => set("phone", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="واتساب (رقم أو رابط)">
-              <input
-                dir="ltr"
-                maxLength={300}
-                value={f.whatsapp}
-                onChange={(e) => set("whatsapp", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="إنستغرام (اسم الحساب بدون @)">
-              <input
-                dir="ltr"
-                maxLength={300}
-                value={f.instagram}
-                onChange={(e) => set("instagram", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="الموقع الإلكتروني">
-              <input
-                dir="ltr"
-                maxLength={2000}
-                placeholder="https://"
-                value={f.website}
-                onChange={(e) => set("website", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
             <Field label="كود الخصم النشط (اختياري)" hint="كود واحد فقط. اتركه فارغاً لإيقافه.">
               <input
                 maxLength={80}
@@ -446,16 +394,6 @@ export function BusinessInfoForm({
                     maxLength={300}
                     value={f.address_ar}
                     onChange={(e) => set("address_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="رابط الاتجاهات (من خرائط قوقل)">
-                  <input
-                    dir="ltr"
-                    maxLength={2000}
-                    placeholder="https://"
-                    value={f.maps_url}
-                    onChange={(e) => set("maps_url", e.target.value)}
                     className={inputClass}
                   />
                 </Field>

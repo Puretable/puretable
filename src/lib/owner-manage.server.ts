@@ -16,7 +16,7 @@ import {
 import { fillAgreementTemplate } from "./agreement/fill-template";
 import { canUseMenu } from "./plans";
 import { isPackagesEnabled } from "./packages-enabled.server";
-import { saveBusinessContact } from "./businesses.server";
+import { saveBusinessContact } from "./business-contact.server";
 import type { BusinessContactInput } from "./businesses.schemas";
 
 /**
