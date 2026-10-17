@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import {
   adminGetBusiness,
+  adminSaveBusinessContact,
   upsertBusiness,
   upsertLink,
   deleteLink,
@@ -19,6 +20,7 @@ import { signCoverUploadUrl } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { LocationPicker } from "@/components/admin/LocationPicker";
 import { BranchEditor } from "@/components/admin/BranchEditor";
+import { BusinessContactEditor } from "@/components/admin/BusinessContactEditor";
 import { LinksEditor } from "@/components/admin/LinksEditor";
 import { MAIN_CITIES, findCity, regionForCity } from "@/lib/saudi";
 import { adminListPlaceCategories } from "@/lib/category.functions";
@@ -105,6 +107,7 @@ function EditBusiness() {
   const save = useServerFn(upsertBusiness);
   const saveLink = useServerFn(upsertLink);
   const removeLink = useServerFn(deleteLink);
+  const saveContact = useServerFn(adminSaveBusinessContact);
   const saveBranch = useServerFn(upsertBranch);
   const removeBranch = useServerFn(deleteBranch);
   const signUpload = useServerFn(signCoverUploadUrl);
@@ -160,6 +163,8 @@ function EditBusiness() {
   }, [existing]);
 
   const links = existing?.business_links ?? [];
+  const bizTiktok = links.find((l: any) => l.platform === "tiktok" && !l.branch_id)?.url ?? null;
+  const bizEmail = links.find((l: any) => l.platform === "email" && !l.branch_id)?.url ?? null;
   const branches = ((existing as any)?.business_branches ?? [])
     .slice()
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -792,6 +797,22 @@ function EditBusiness() {
           )}
         </Grid>
       </Section>
+
+      {!isNew && (
+        <Section title="تيك توك والبريد الإلكتروني / TikTok & email (business-level)">
+          <BusinessContactEditor
+            businessId={id}
+            website={form.website ?? null}
+            instagram={form.instagram ?? null}
+            tiktok={bizTiktok}
+            email={bizEmail}
+            onSave={async (input) => {
+              await saveContact({ data: input });
+              await qc.invalidateQueries({ queryKey: ["admin-business", id] });
+            }}
+          />
+        </Section>
+      )}
 
       {!isNew && (
         <Section title="الفروع / Branches">

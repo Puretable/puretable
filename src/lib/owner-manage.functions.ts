@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { allow } from "./rate-limit.server";
 import { AUTHENTICATED_BUSINESS_COLUMNS } from "./businesses.server";
+import { BusinessContactInput } from "./businesses.schemas";
 import {
   acceptPartnershipAgreement,
   deleteMenuItem,
@@ -13,6 +14,7 @@ import {
   saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
+  saveOwnerBusinessContact,
   saveOwnerLink,
   signOwnerUpload,
   updateOwnerBusiness,
@@ -62,7 +64,13 @@ export const getOwnerBusiness = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Forbidden");
-    return row as unknown as OwnerBusinessDetail;
+    const links = (row as unknown as { business_links: { platform: string; branch_id: string | null; url: string }[] })
+      .business_links;
+    return {
+      ...row,
+      tiktok: links.find((l) => l.platform === "tiktok" && !l.branch_id)?.url ?? null,
+      email: links.find((l) => l.platform === "email" && !l.branch_id)?.url ?? null,
+    } as unknown as OwnerBusinessDetail;
   });
 
 export const saveOwnerBusiness = createServerFn({ method: "POST" })
@@ -119,6 +127,11 @@ export const deleteOwnerBranchFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     deleteOwnerBranch(await actorFor(context), data.businessId, data.id),
   );
+
+export const saveOwnerBusinessContactFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => BusinessContactInput.parse(input))
+  .handler(async ({ data, context }) => saveOwnerBusinessContact(await actorFor(context), data));
 
 export const saveOwnerLinkFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

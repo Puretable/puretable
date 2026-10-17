@@ -6,7 +6,18 @@ import { BranchInput } from "@/lib/businesses.schemas";
 import { branchLimitLabel, remainingBranchSlots, type PlanTier } from "@/lib/plans";
 import { LocationPicker } from "./LocationPicker";
 
-type Branch = z.input<typeof BranchInput>;
+// maps_url/phone/whatsapp/delivery_url use a normalizing validator (z.preprocess), so their z.input
+// type is "unknown" — fine for parsing, not for a plain text input's value. Overridden here to the
+// actual string-or-null shape the form works with.
+type Branch = Omit<
+  z.input<typeof BranchInput>,
+  "maps_url" | "phone" | "whatsapp" | "delivery_url"
+> & {
+  maps_url?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  delivery_url?: string | null;
+};
 const DAYS = [
   ["sun", "الأحد"],
   ["mon", "الاثنين"],
@@ -25,9 +36,6 @@ const FIELDS = [
   ["district_ar", "الحي بالعربية"],
   ["address", "العنوان"],
   ["address_ar", "العنوان بالعربية"],
-  ["phone", "الهاتف"],
-  ["whatsapp", "واتساب"],
-  ["maps_url", "رابط الاتجاهات (اختياري)"],
 ] as const;
 
 export function BranchEditor({
@@ -224,6 +232,91 @@ export function BranchEditor({
               </label>
             ))}
           </div>
+
+          <div className="space-y-3 rounded-xl border p-3">
+            <p className="text-sm font-medium">طرق التواصل لهذا الفرع</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="grid gap-1 text-sm">
+                الهاتف
+                <input
+                  dir="ltr"
+                  className="rounded-lg border bg-background p-2"
+                  value={draft.phone ?? ""}
+                  onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                />
+              </label>
+              <label className="grid gap-1 text-sm">
+                رقم واتساب
+                <input
+                  dir="ltr"
+                  className="rounded-lg border bg-background p-2"
+                  value={draft.whatsapp ?? ""}
+                  onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })}
+                />
+              </label>
+              <label className="grid gap-1 text-sm sm:col-span-2">
+                رابط الاتجاهات (مابس) — https فقط
+                <input
+                  dir="ltr"
+                  placeholder="https://"
+                  className="rounded-lg border bg-background p-2"
+                  value={draft.maps_url ?? ""}
+                  onChange={(e) => setDraft({ ...draft, maps_url: e.target.value })}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border p-3">
+            <p className="text-sm font-medium">الطلب والاستلام لهذا الفرع</p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={draft.whatsapp_orders_enabled ?? false}
+                onChange={(e) => setDraft({ ...draft, whatsapp_orders_enabled: e.target.checked })}
+              />
+              <span>
+                نستقبل الطلبات عبر واتساب
+                {draft.whatsapp_orders_enabled && !draft.whatsapp?.trim() && (
+                  <span className="mt-1 block text-xs text-destructive">
+                    أدخل رقم واتساب أعلاه أولاً حتى يظهر زر الطلب للزوار.
+                  </span>
+                )}
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={draft.pickup_enabled ?? false}
+                onChange={(e) => setDraft({ ...draft, pickup_enabled: e.target.checked })}
+              />
+              استلام من المنشأة
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={draft.delivery_enabled ?? false}
+                onChange={(e) => setDraft({ ...draft, delivery_enabled: e.target.checked })}
+              />
+              عندنا توصيل
+            </label>
+            {draft.delivery_enabled && (
+              <label className="grid gap-1 text-sm">
+                رابط التوصيل الخاص بالمنشأة (اختياري) — https فقط
+                <input
+                  dir="ltr"
+                  placeholder="https://"
+                  className="rounded-lg border bg-background p-2"
+                  value={draft.delivery_url ?? ""}
+                  onChange={(e) => setDraft({ ...draft, delivery_url: e.target.value })}
+                />
+              </label>
+            )}
+          </div>
+
           <label className="flex gap-2 text-sm">
             <input
               type="checkbox"

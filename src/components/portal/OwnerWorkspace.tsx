@@ -2,19 +2,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Lock } from "lucide-react";
 import { BranchEditor } from "@/components/admin/BranchEditor";
-import { LinksEditor } from "@/components/admin/LinksEditor";
+import { BusinessContactEditor } from "@/components/admin/BusinessContactEditor";
 import { BusinessInfoForm } from "./BusinessInfoForm";
+import { ContactOrderingPreview } from "./ContactOrderingPreview";
 import { MenuManager } from "./MenuManager";
 import { PhotosManager } from "./PhotosManager";
 import {
   deleteMenuItemFn,
   deleteOwnerBranchFn,
-  deleteOwnerLinkFn,
   getOwnerBusiness,
   saveMenuItemFn,
   saveOwnerBranchFn,
   saveOwnerBusiness,
-  saveOwnerLinkFn,
+  saveOwnerBusinessContactFn,
   saveOwnerPhotosFn,
   signBusinessUpload,
 } from "@/lib/owner-manage.functions";
@@ -22,7 +22,6 @@ import type {
   MenuItemInput,
   OwnerBranchInput,
   OwnerBusinessInput,
-  OwnerLinkInput,
 } from "@/lib/owner-manage.schemas";
 import { friendlyPortalError, type OwnerBusiness } from "@/lib/owner-portal";
 
@@ -52,8 +51,7 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
   const savePhotos = useServerFn(saveOwnerPhotosFn);
   const saveBranch = useServerFn(saveOwnerBranchFn);
   const removeBranch = useServerFn(deleteOwnerBranchFn);
-  const saveLink = useServerFn(saveOwnerLinkFn);
-  const removeLink = useServerFn(deleteOwnerLinkFn);
+  const saveContact = useServerFn(saveOwnerBusinessContactFn);
   const saveItem = useServerFn(saveMenuItemFn);
   const removeItem = useServerFn(deleteMenuItemFn);
   const sign = useServerFn(signBusinessUpload);
@@ -172,11 +170,14 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
       )}
 
       {tab === "links" && (
-        <section className="space-y-3">
-          <h2 className="text-xl font-semibold">روابط الطلب والتواصل</h2>
-          <p className="text-sm text-muted-foreground">
-            روابط التوصيل والحجز والتواصل التي تظهر كأزرار على صفحتك.
-          </p>
+        <section className="space-y-5">
+          <div>
+            <h2 className="text-xl font-semibold">التواصل والطلب</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              طرق التواصل المشتركة لكل الفروع أدناه؛ الهاتف وواتساب ومابس وخيارات الاستلام والتوصيل
+              تُحدَّد لكل فرع من تبويب «الفروع».
+            </p>
+          </div>
           {!overview.entitlements.show_links && (
             <p className="rounded-xl border border-dashed p-3 text-sm">
               باقتك الحالية لا تُظهر هذه الروابط للزوار. يمكنك تجهيزها الآن وستظهر عند الترقية إلى
@@ -184,28 +185,41 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
             </p>
           )}
           {suspended ? (
-            <ul className="space-y-2">
-              {row.business_links.map((l) => (
-                <li key={l.id} dir="ltr" className="rounded-xl border p-3 text-start text-xs">
-                  {l.platform} — {l.url}
-                </li>
+            <dl className="grid gap-2 text-sm">
+              {(
+                [
+                  ["website", "الموقع الإلكتروني"],
+                  ["instagram", "إنستغرام"],
+                  ["tiktok", "تيك توك"],
+                  ["email", "البريد الإلكتروني"],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key} className="rounded-xl border p-3">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd dir="ltr" className="text-start">
+                    {row[key] || "—"}
+                  </dd>
+                </div>
               ))}
-            </ul>
+            </dl>
           ) : (
-            <LinksEditor
+            <BusinessContactEditor
               businessId={businessId}
-              links={row.business_links}
-              branches={branches}
-              onSave={async (link: OwnerLinkInput) => {
-                await friendly(saveLink({ data: link }));
-                await refresh();
-              }}
-              onDelete={async (id: string) => {
-                await friendly(removeLink({ data: { businessId, id } }));
+              website={row.website}
+              instagram={row.instagram}
+              tiktok={row.tiktok}
+              email={row.email}
+              onSave={async (input) => {
+                await friendly(saveContact({ data: input }));
                 await refresh();
               }}
             />
           )}
+
+          <div>
+            <h3 className="text-sm font-semibold">هذا ما سيراه الزائر</h3>
+            <ContactOrderingPreview business={row} branches={branches} />
+          </div>
         </section>
       )}
 

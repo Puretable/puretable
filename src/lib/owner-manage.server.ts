@@ -16,6 +16,8 @@ import {
 import { fillAgreementTemplate } from "./agreement/fill-template";
 import { canUseMenu } from "./plans";
 import { isPackagesEnabled } from "./packages-enabled.server";
+import { saveBusinessContact } from "./businesses.server";
+import type { BusinessContactInput } from "./businesses.schemas";
 
 /**
  * Owner self-service operations.
@@ -228,6 +230,20 @@ export async function acceptPartnershipAgreement(
   return { ok: true as const };
 }
 
+/**
+ * Recomputes ONLY the svc_pickup/svc_delivery tags in businesses.categories from this business's
+ * branches (tag present if any branch has the matching toggle on) via the narrow, owner-callable
+ * owner_sync_pickup_delivery_tags RPC — the sole path by which an owner can ever influence
+ * categories. Called through the owner's OWN session (not the service-role client) so the RPC's own
+ * ownership check is genuinely exercised, not just trusted internal plumbing.
+ */
+async function syncPickupDeliveryTags(actor: Actor, businessId: string) {
+  const { error } = await actor.userClient.rpc("owner_sync_pickup_delivery_tags", {
+    _business_id: businessId,
+  });
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
 export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
   await requireOwnerAccess(actor, input.business_id);
   const { id, business_id, ...fields } = input;
@@ -247,6 +263,7 @@ export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
       .select()
       .single();
     if (error) throw new Error(friendlyDbError(error.message));
+    await syncPickupDeliveryTags(actor, business_id);
     return data;
   }
   const { data, error } = await actor.adminClient
@@ -255,6 +272,7 @@ export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
     .select()
     .single();
   if (error) throw new Error(friendlyDbError(error.message));
+  await syncPickupDeliveryTags(actor, business_id);
   return data;
 }
 
@@ -266,7 +284,19 @@ export async function deleteOwnerBranch(actor: Actor, businessId: string, id: st
     .eq("id", id)
     .eq("business_id", businessId);
   if (error) throw new Error(error.message);
+  await syncPickupDeliveryTags(actor, businessId);
   return { ok: true as const };
+}
+
+/**
+ * The 4 business-level contact fields (website, instagram, tiktok, email) — shared by every
+ * branch. website/instagram write to the plain `businesses` columns; tiktok/email upsert a
+ * business-level (branch_id null) business_links row, enforced one-per-platform by
+ * business_links_business_level_unique.
+ */
+export async function saveOwnerBusinessContact(actor: Actor, input: BusinessContactInput) {
+  await requireOwnerAccess(actor, input.business_id);
+  return saveBusinessContact(actor.adminClient, input);
 }
 
 async function assertBranchBelongs(actor: Actor, businessId: string, branchId: string) {

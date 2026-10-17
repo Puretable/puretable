@@ -1,8 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { BranchInput, BusinessInput, LinkInput } from "@/lib/businesses.schemas";
-import { assertAdmin, AUTHENTICATED_BUSINESS_COLUMNS } from "@/lib/businesses.server";
+import {
+  BranchInput,
+  BusinessContactInput,
+  BusinessInput,
+  LinkInput,
+} from "@/lib/businesses.schemas";
+import {
+  assertAdmin,
+  AUTHENTICATED_BUSINESS_COLUMNS,
+  saveBusinessContact,
+} from "@/lib/businesses.server";
 import { PLAN_TIERS, type PlanTier } from "@/lib/plans";
 
 // -------- Admin --------
@@ -173,6 +182,9 @@ export const upsertBranch = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(readableBranchError(error.message));
+    await context.supabase.rpc("owner_sync_pickup_delivery_tags", {
+      _business_id: data.business_id,
+    });
     return row;
   });
 
@@ -181,9 +193,26 @@ export const deleteBranch = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
+    const { data: branch, error: readError } = await context.supabase
+      .from("business_branches")
+      .select("business_id")
+      .eq("id", data.id)
+      .single();
+    if (readError) throw new Error(readError.message);
     const { error } = await context.supabase.from("business_branches").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
+    await context.supabase.rpc("owner_sync_pickup_delivery_tags", {
+      _business_id: branch.business_id,
+    });
     return { ok: true };
+  });
+
+export const adminSaveBusinessContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => BusinessContactInput.parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    return saveBusinessContact(context.supabase, data);
   });
 
 export const adminListBusinesses = createServerFn({ method: "GET" })

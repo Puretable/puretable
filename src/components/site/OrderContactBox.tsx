@@ -1,24 +1,23 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Phone, MapPin, Instagram, MessageCircle, Music2, Minus, Plus } from "lucide-react";
+import { MessageCircle, Minus, Plus, Truck } from "lucide-react";
 import { goHref } from "@/lib/track";
 import { WHATSAPP_INQUIRY_MESSAGE, whatsappHref } from "@/lib/contact";
 import type { MenuItem } from "@/lib/owner-manage.schemas";
 
 /**
- * Consolidated contact/order box. The pre-filled WhatsApp greeting
- * (WHATSAPP_INQUIRY_MESSAGE, see contact.ts) is never changed here — the chosen method, any
- * selected menu items, and a confirm-with-establishment line are only ever appended to it.
- * No selection is stored anywhere: it only exists in this component's state, folded into the
+ * Ordering & delivery box — shown only when the business (or this branch) enabled ordering,
+ * delivery, or pickup. Never rendered otherwise (no empty or misleading boxes). The pre-filled
+ * WhatsApp greeting (WHATSAPP_INQUIRY_MESSAGE, see contact.ts) is never changed here — the chosen
+ * method, any selected menu items, and a confirm-with-establishment line are only ever appended to
+ * it. No selection is stored anywhere: it only exists in this component's state, folded into the
  * WhatsApp message text at the moment the visitor opens the chat.
  */
 export function OrderContactBox({
   businessSlug,
   whatsappNumber,
-  phone,
-  mapsHref,
-  instagramUrl,
-  tiktokUrl,
+  whatsappOrdersEnabled,
+  deliveryUrl,
   pickupEnabled,
   deliveryEnabled,
   menuItems,
@@ -27,16 +26,50 @@ export function OrderContactBox({
   businessSlug: string;
   /** null when there is no number, or the business's plan does not show it. */
   whatsappNumber: string | null;
-  phone: string | null;
-  mapsHref: string | null;
-  instagramUrl: string | null;
-  tiktokUrl: string | null;
+  whatsappOrdersEnabled: boolean;
+  deliveryUrl: string | null;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
   menuItems: MenuItem[];
   lang: string;
 }) {
   const { t } = useTranslation();
+  const hasWhatsappButton = whatsappOrdersEnabled && !!whatsappNumber;
+  if (!pickupEnabled && !deliveryEnabled && !hasWhatsappButton) return null;
+
+  return (
+    <OrderContactBoxInner
+      businessSlug={businessSlug}
+      whatsappNumber={hasWhatsappButton ? whatsappNumber : null}
+      deliveryUrl={deliveryEnabled ? deliveryUrl : null}
+      pickupEnabled={pickupEnabled}
+      deliveryEnabled={deliveryEnabled}
+      menuItems={menuItems}
+      lang={lang}
+      t={t}
+    />
+  );
+}
+
+function OrderContactBoxInner({
+  businessSlug,
+  whatsappNumber,
+  deliveryUrl,
+  pickupEnabled,
+  deliveryEnabled,
+  menuItems,
+  lang,
+  t,
+}: {
+  businessSlug: string;
+  whatsappNumber: string | null;
+  deliveryUrl: string | null;
+  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
+  menuItems: MenuItem[];
+  lang: string;
+  t: (key: string) => string;
+}) {
   const [method, setMethod] = useState<"pickup" | "delivery" | null>(
     pickupEnabled && !deliveryEnabled
       ? "pickup"
@@ -83,28 +116,20 @@ export function OrderContactBox({
   const waTrackedHref = waHref
     ? goHref({ to: waHref, type: "click_whatsapp", business: businessSlug, platform: "whatsapp" })
     : null;
-  const callTrackedHref = phone
+  const deliveryTrackedHref = deliveryUrl
     ? goHref({
-        to: `tel:${phone.replace(/\s/g, "")}`,
-        type: "click_phone",
+        to: deliveryUrl,
+        type: "click_delivery",
         business: businessSlug,
-        platform: "phone",
+        platform: "delivery",
       })
     : null;
-  const tiktokTrackedHref = tiktokUrl
-    ? goHref({ to: tiktokUrl, type: "click_social", business: businessSlug, platform: "tiktok" })
-    : null;
-
-  const primaryHref = waTrackedHref ?? callTrackedHref;
-  const primaryIsWhatsapp = !!waTrackedHref;
-  const showCallAsSecondary = primaryIsWhatsapp && !!callTrackedHref;
 
   return (
     <div className="rounded-2xl border border-border bg-secondary/40 p-5">
       <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {t("business.contact_booking")}
       </h3>
-      <p className="mt-1 text-xs text-muted-foreground">{t("business.order_note")}</p>
 
       {(pickupEnabled || deliveryEnabled) && (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -121,7 +146,7 @@ export function OrderContactBox({
         </div>
       )}
 
-      {menuItems.length > 0 && (
+      {waTrackedHref && menuItems.length > 0 && (
         <div className="mt-4">
           <p className="text-xs text-muted-foreground">{t("business.menu_select_hint")}</p>
           <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pe-1">
@@ -169,7 +194,7 @@ export function OrderContactBox({
         </div>
       )}
 
-      {pickupEnabled && deliveryEnabled && (
+      {waTrackedHref && pickupEnabled && deliveryEnabled && (
         <div className="mt-4">
           <p className="text-xs text-muted-foreground">{t("business.choose_method")}</p>
           <div className="mt-1.5 flex gap-2">
@@ -202,63 +227,31 @@ export function OrderContactBox({
       )}
 
       <div className="mt-4 space-y-2">
-        {primaryHref && (
+        {waTrackedHref && (
           <a
-            href={primaryHref}
+            href={waTrackedHref}
             target="_blank"
             rel="noreferrer noopener"
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
-            {primaryIsWhatsapp ? (
-              <MessageCircle className="h-4 w-4" />
-            ) : (
-              <Phone className="h-4 w-4" />
-            )}
-            {primaryIsWhatsapp ? t("business.order_via_whatsapp") : t("business.call_now")}
+            <MessageCircle className="h-4 w-4" />
+            {t("business.order_via_whatsapp")}
           </a>
         )}
-
-        <div className="flex flex-wrap gap-2">
-          {showCallAsSecondary && (
-            <a
-              href={callTrackedHref!}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-            >
-              <Phone className="h-3.5 w-3.5" /> {t("business.call_now")}
-            </a>
-          )}
-          {mapsHref && (
-            <a
-              href={mapsHref}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-            >
-              <MapPin className="h-3.5 w-3.5" /> {t("business.open_in_maps")}
-            </a>
-          )}
-          {instagramUrl && (
-            <a
-              href={instagramUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-            >
-              <Instagram className="h-3.5 w-3.5" /> Instagram
-            </a>
-          )}
-          {tiktokTrackedHref && (
-            <a
-              href={tiktokTrackedHref}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-            >
-              <Music2 className="h-3.5 w-3.5" /> TikTok
-            </a>
-          )}
-        </div>
+        {deliveryTrackedHref && (
+          <a
+            href={deliveryTrackedHref}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center justify-center gap-2 rounded-full border border-primary bg-card px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary-soft"
+          >
+            <Truck className="h-4 w-4" />
+            {t("business.delivery_choice")}
+          </a>
+        )}
       </div>
+
+      <p className="mt-3 text-xs text-muted-foreground">{t("business.order_note")}</p>
     </div>
   );
 }

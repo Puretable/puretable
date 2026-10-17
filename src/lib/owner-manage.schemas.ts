@@ -305,7 +305,20 @@ export type OwnerLinkRow = {
   sort_order: number;
 };
 
-export type OwnerBranchRow = z.input<typeof BranchInput> & { id: string };
+// maps_url/phone/whatsapp/delivery_url use a z.preprocess-based validator (so free-form input can
+// be normalized), which makes z.input<> infer "unknown" for them — fine for parsing, but it breaks
+// this type's only real job here: describing the GET response shape for serialization checks. Those
+// 4 fields are overridden with their actual stored (output) shape instead.
+export type OwnerBranchRow = Omit<
+  z.input<typeof BranchInput>,
+  "maps_url" | "phone" | "whatsapp" | "delivery_url"
+> & {
+  id: string;
+  maps_url: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  delivery_url: string | null;
+};
 
 /** Everything the portal loads for one business (the caller's own; RLS enforces that). */
 export type OwnerBusinessDetail = {
@@ -333,6 +346,9 @@ export type OwnerBusinessDetail = {
   whatsapp: string | null;
   instagram: string | null;
   website: string | null;
+  /** Business-level, derived from a business_links row with branch_id null (see saveBusinessContact). */
+  tiktok: string | null;
+  email: string | null;
   maps_url: string | null;
   hours: Record<string, string>;
   discount_code: string | null;

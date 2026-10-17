@@ -16,6 +16,7 @@ import {
   saveBusinessBillingFields,
   saveMenuItem,
   saveOwnerBranch,
+  saveOwnerBusinessContact,
   saveOwnerLink,
   signOwnerUpload,
   updateOwnerBusiness,
@@ -30,6 +31,7 @@ import {
   OwnerLinkInput,
   OwnerPhotosInput,
 } from "../src/lib/owner-manage.schemas";
+import { BusinessContactInput } from "../src/lib/businesses.schemas";
 
 const url = process.env["SUPABASE_URL"];
 const ref = process.env["PT_TEST_PROJECT_REF"];
@@ -607,6 +609,163 @@ try {
   step(
     "links: add, edit, delete; share text is cleaned; cannot use or touch another business's branch/link",
   );
+
+  console.log("Contact & ordering redesign: business-level contact fields");
+  const contact1 = await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({
+      business_id: A,
+      website: "example.com",
+      instagram: "@QA_Cafe",
+      tiktok: "qa_cafe",
+      email: "hello@qa-cafe.example",
+    }),
+  );
+  assert.equal(contact1.website, "https://example.com/");
+  assert.equal(contact1.instagram, "https://instagram.com/QA_Cafe");
+  assert.equal(contact1.tiktok, "https://tiktok.com/@qa_cafe");
+  assert.equal(contact1.email, "hello@qa-cafe.example");
+  step("business-level contact: website/instagram/tiktok/email save with per-type normalization");
+
+  const contact2 = await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({ business_id: A, tiktok: "qa_cafe_v2" }),
+  );
+  assert.equal(contact2.tiktok, "https://tiktok.com/@qa_cafe_v2");
+  assert.equal(
+    ok(
+      await service
+        .from("business_links")
+        .select("id")
+        .eq("business_id", A)
+        .eq("platform", "tiktok"),
+    ).length,
+    1,
+    "re-saving tiktok updates the one business-level row, never a duplicate",
+  );
+  step("no duplicate business-level link is ever created — the unique index + upsert hold");
+
+  await rejects(
+    saveOwnerBusinessContact(
+      ownerBActor,
+      BusinessContactInput.parse({ business_id: A, website: "https://hijack.example" }),
+    ),
+    /Forbidden/,
+    "another business's owner saving A's contact fields",
+  );
+  step("another business's owner cannot change this business's contact fields");
+
+  // A legacy business-level business_links("website") row, saved before this redesign, must stay
+  // visible to visitors even though the new UI writes to the businesses.website column instead.
+  ok(await service.from("businesses").update({ website: null }).eq("id", A));
+  const legacyWebsite = ok(
+    await service
+      .from("business_links")
+      .insert({
+        business_id: A,
+        branch_id: null,
+        platform: "website",
+        url: "https://legacy.example",
+      })
+      .select("id")
+      .single(),
+  );
+  await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({ business_id: A, instagram: "qa_cafe" }),
+  );
+  assert.equal(
+    ok(await service.from("business_links").select("id").eq("id", legacyWebsite.id)).length,
+    1,
+    "the old business_links(website) row is never touched by the new save path",
+  );
+  step("old data (a legacy business-level link row) is never deleted or rewritten by the new path");
+
+  console.log("Contact & ordering redesign: per-branch pickup/delivery/WhatsApp-orders");
+  const brA = await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      phone: "0551234567",
+      whatsapp: "0551234567",
+      maps_url: "https://maps.example/olaya",
+      pickup_enabled: true,
+      delivery_enabled: true,
+      delivery_url: "https://order.qa-cafe.example",
+      whatsapp_orders_enabled: true,
+    }),
+  );
+  assert.equal(brA.phone, "+966551234567");
+  assert.equal(brA.whatsapp, "+966551234567");
+  assert.equal(brA.pickup_enabled, true);
+  assert.equal(brA.delivery_enabled, true);
+  assert.equal(brA.delivery_url, "https://order.qa-cafe.example");
+  assert.equal(brA.whatsapp_orders_enabled, true);
+  const tagsAfterOn = ok(await service.from("businesses").select("categories").eq("id", A).single())
+    .categories as string[];
+  assert.ok(tagsAfterOn.includes("svc_pickup") && tagsAfterOn.includes("svc_delivery"));
+  step(
+    "a branch's pickup/delivery toggles save, and automatically tag the business for both public filters",
+  );
+
+  await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      phone: "0551234567",
+      whatsapp: "0551234567",
+      maps_url: "https://maps.example/olaya",
+      whatsapp_orders_enabled: true,
+      pickup_enabled: false,
+      delivery_enabled: false,
+    }),
+  );
+  const tagsAfterOff = ok(
+    await service.from("businesses").select("categories").eq("id", A).single(),
+  ).categories as string[];
+  assert.ok(!tagsAfterOff.includes("svc_pickup") && !tagsAfterOff.includes("svc_delivery"));
+  step("turning both toggles off removes the business from both filters automatically");
+
+  await rejects(
+    (async () =>
+      ok(await ownerB.client.rpc("owner_sync_pickup_delivery_tags", { _business_id: A })))(),
+    /Forbidden/,
+    "another business's owner calling the tag-sync RPC for A",
+  );
+  const { error: craftedCategoryErr } = await owner.client
+    .from("businesses")
+    .update({ categories: ["svc_pickup", "cf_totally-fake-tag"] })
+    .eq("id", A);
+  assert.ok(craftedCategoryErr, "an owner cannot write categories directly at all, by any value");
+  step(
+    "an owner can influence only svc_pickup/svc_delivery, only for their own business, only through the narrow RPC — never any other category tag, never directly",
+  );
+
+  assert.equal(
+    OwnerBranchInput.safeParse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      maps_url: "javascript:alert(1)",
+    }).success,
+    false,
+    "javascript: scheme rejected for maps_url",
+  );
+  assert.equal(
+    OwnerBranchInput.safeParse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      delivery_url: "http://not-https.example",
+    }).success,
+    false,
+    "bare http: rejected for delivery_url",
+  );
+  step("maps_url/delivery_url reject non-https schemes (javascript:, data:, bare http:)");
 
   console.log("Gluten-free menu (Free blocked, Pro allowed)");
   await rejects(

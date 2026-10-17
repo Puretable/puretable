@@ -163,6 +163,8 @@ export type Database = {
           city: string | null;
           city_ar: string | null;
           created_at: string;
+          delivery_enabled: boolean;
+          delivery_url: string | null;
           district: string | null;
           district_ar: string | null;
           hours: Json;
@@ -173,6 +175,7 @@ export type Database = {
           name: string;
           name_ar: string | null;
           permanently_closed: boolean;
+          pickup_enabled: boolean;
           plan_limited: boolean;
           phone: string | null;
           place_id: string | null;
@@ -181,6 +184,7 @@ export type Database = {
           sort_order: number;
           updated_at: string;
           whatsapp: string | null;
+          whatsapp_orders_enabled: boolean;
         };
         Insert: {
           address?: string | null;
@@ -189,6 +193,8 @@ export type Database = {
           city?: string | null;
           city_ar?: string | null;
           created_at?: string;
+          delivery_enabled?: boolean;
+          delivery_url?: string | null;
           district?: string | null;
           district_ar?: string | null;
           hours?: Json;
@@ -199,6 +205,7 @@ export type Database = {
           name: string;
           name_ar?: string | null;
           permanently_closed?: boolean;
+          pickup_enabled?: boolean;
           plan_limited?: boolean;
           phone?: string | null;
           place_id?: string | null;
@@ -207,6 +214,7 @@ export type Database = {
           sort_order?: number;
           updated_at?: string;
           whatsapp?: string | null;
+          whatsapp_orders_enabled?: boolean;
         };
         Update: {
           address?: string | null;
@@ -215,6 +223,8 @@ export type Database = {
           city?: string | null;
           city_ar?: string | null;
           created_at?: string;
+          delivery_enabled?: boolean;
+          delivery_url?: string | null;
           district?: string | null;
           district_ar?: string | null;
           hours?: Json;
@@ -225,6 +235,7 @@ export type Database = {
           name?: string;
           name_ar?: string | null;
           permanently_closed?: boolean;
+          pickup_enabled?: boolean;
           plan_limited?: boolean;
           phone?: string | null;
           place_id?: string | null;
@@ -233,6 +244,7 @@ export type Database = {
           sort_order?: number;
           updated_at?: string;
           whatsapp?: string | null;
+          whatsapp_orders_enabled?: boolean;
         };
         Relationships: [
           {
@@ -955,6 +967,10 @@ export type Database = {
       admin_delete_business: {
         Args: { _business_id: string };
         Returns: undefined;
+      };
+      owner_sync_pickup_delivery_tags: {
+        Args: { _business_id: string };
+        Returns: string[];
       };
       save_business_billing_fields: {
         Args: {

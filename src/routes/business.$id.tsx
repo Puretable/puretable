@@ -26,6 +26,7 @@ import { SERVICE_DEFS } from "@/lib/services";
 import { useFilters } from "@/lib/filters";
 import { SafetyNote, establishmentMenuLevel } from "@/components/site/SafetyBadge";
 import { OrderContactBox } from "@/components/site/OrderContactBox";
+import { ContactIconsRow } from "@/components/site/ContactIconsRow";
 import { FavoriteButton } from "@/components/site/FavoriteButton";
 import { CoverImage } from "@/components/site/CoverImage";
 import { goHref } from "@/lib/track";
@@ -248,17 +249,19 @@ function BusinessDetail() {
   // Package gating: the Free page keeps name, category, location, directions
   // and phone only. WhatsApp, TikTok and menu/product links belong to the paid packages.
   const plan = featuresOf(b);
-  const whatsappNumber = plan.showLinks ? (b.whatsapp ?? null) : null;
-  const tiktokUrl = plan.showLinks
-    ? (savedLinks.find((l) => l.platform === "tiktok")?.url ?? null)
-    : null;
-  const instagramUrl = instagramHref(b.instagram);
+  const instagramUrl = plan.showLinks ? instagramHref(b.instagram) : null;
+  const tiktokUrl = plan.showLinks ? (b.tiktok ?? null) : null;
+  const websiteUrl = plan.showLinks ? (b.website ?? null) : null;
+  const email = plan.showLinks ? (b.email ?? null) : null;
   const mapsHref = showLocation
     ? goHref({ to: mapsUrl, type: "click_maps", business: b.id, platform: "maps" })
     : null;
-  const pickupEnabled = hasCategory(b, "svc_pickup");
-  const deliveryEnabled = hasCategory(b, "svc_delivery");
   const menuItems = b.menu ?? [];
+  // Contact/ordering now live per-branch (every business has >=1 branch); the single-branch (or,
+  // defensively, zero-branch) case merges into one contact row + one ordering box instead of
+  // duplicating a business-level and a branch-level one side by side.
+  const singleBranch = branches.length <= 1 ? (branches[0] ?? null) : null;
+  const showMultiBranchContact = branches.length > 1;
   const gallery = visiblePhotos(b).slice(1);
 
   // Branches shown as saved; closed ones stay visible but flagged. Customers can
@@ -532,64 +535,50 @@ function BusinessDetail() {
                                 ))}
                               </ul>
                             )}
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {br.phone && (
-                                <a
-                                  href={goHref({
-                                    to: `tel:${br.phone.replace(/\s/g, "")}`,
-                                    type: "click_phone",
+                            {showMultiBranchContact && (
+                              <div className="mt-3 space-y-3">
+                                <ContactIconsRow
+                                  businessSlug={b.id}
+                                  mapsHref={goHref({
+                                    to: brMaps,
+                                    type: "click_maps",
                                     business: b.id,
-                                    platform: "phone",
+                                    platform: "maps",
                                   })}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-                                >
-                                  <Phone className="h-3.5 w-3.5" /> {br.phone}
-                                </a>
-                              )}
-                              {plan.showLinks && whatsappHref(br.whatsapp, whatsappMessage) && (
-                                <a
-                                  href={goHref({
-                                    to: whatsappHref(br.whatsapp, whatsappMessage)!,
-                                    type: "click_whatsapp",
-                                    business: b.id,
-                                    platform: "whatsapp",
-                                  })}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-                                >
-                                  <MessageCircle className="h-3.5 w-3.5" /> {t("business.whatsapp")}
-                                </a>
-                              )}
-                              <a
-                                href={goHref({
-                                  to: brMaps,
-                                  type: "click_maps",
-                                  business: b.id,
-                                  platform: "maps",
-                                })}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium hover:border-primary/40 hover:text-primary"
-                              >
-                                <MapPin className="h-3.5 w-3.5" /> {t("business.open_in_maps")}
-                              </a>
-                              {/* Booking links saved for this branch only (third-party delivery hidden). */}
-                              {(plan.showLinks ? (br.links ?? []) : [])
-                                .filter((l) => !THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform))
-                                .map((l) => (
-                                  <a
-                                    key={l.id}
-                                    href={trackedHref(l)}
-                                    target={l.platform === "phone" ? undefined : "_blank"}
-                                    rel="noreferrer noopener"
-                                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
-                                  >
-                                    {l.label || platformLabel(l.platform, t)}
-                                    <ExternalLink className="h-3 w-3 rtl:rotate-180" />
-                                  </a>
-                                ))}
-                            </div>
+                                  phone={br.phone ?? null}
+                                  whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
+                                  hasWhatsappOrders={!!br.whatsappOrdersEnabled}
+                                />
+                                <OrderContactBox
+                                  businessSlug={b.id}
+                                  whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
+                                  whatsappOrdersEnabled={!!br.whatsappOrdersEnabled}
+                                  deliveryUrl={br.deliveryUrl ?? null}
+                                  pickupEnabled={!!br.pickupEnabled}
+                                  deliveryEnabled={!!br.deliveryEnabled}
+                                  menuItems={menuItems}
+                                  lang={lang}
+                                />
+                                {/* Legacy per-branch links saved under other platforms (x, facebook, booking apps…),
+                                    kept visible exactly as before; third-party delivery stays hidden. */}
+                                {(plan.showLinks ? (br.links ?? []) : [])
+                                  .filter(
+                                    (l) => !THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform),
+                                  )
+                                  .map((l) => (
+                                    <a
+                                      key={l.id}
+                                      href={trackedHref(l)}
+                                      target={l.platform === "phone" ? undefined : "_blank"}
+                                      rel="noreferrer noopener"
+                                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
+                                    >
+                                      {l.label || platformLabel(l.platform, t)}
+                                      <ExternalLink className="h-3 w-3 rtl:rotate-180" />
+                                    </a>
+                                  ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -637,18 +626,41 @@ function BusinessDetail() {
                   </div>
                 )}
 
-                <OrderContactBox
+                <ContactIconsRow
                   businessSlug={b.id}
-                  whatsappNumber={whatsappNumber}
-                  phone={b.phone ?? null}
-                  mapsHref={mapsHref}
-                  instagramUrl={instagramUrl}
-                  tiktokUrl={tiktokUrl}
-                  pickupEnabled={pickupEnabled}
-                  deliveryEnabled={deliveryEnabled}
-                  menuItems={menuItems}
-                  lang={lang}
+                  mapsHref={showMultiBranchContact ? null : (singleBranch?.mapsUrl ?? mapsHref)}
+                  website={websiteUrl}
+                  instagram={instagramUrl}
+                  tiktok={tiktokUrl}
+                  email={email}
+                  phone={showMultiBranchContact ? null : (singleBranch?.phone ?? b.phone ?? null)}
+                  whatsappNumber={
+                    plan.showLinks && !showMultiBranchContact
+                      ? (singleBranch?.whatsapp ?? b.whatsapp ?? null)
+                      : null
+                  }
+                  hasWhatsappOrders={
+                    plan.showLinks && !showMultiBranchContact
+                      ? !!singleBranch?.whatsappOrdersEnabled
+                      : false
+                  }
                 />
+                {!showMultiBranchContact && (
+                  <OrderContactBox
+                    businessSlug={b.id}
+                    whatsappNumber={
+                      plan.showLinks ? (singleBranch?.whatsapp ?? b.whatsapp ?? null) : null
+                    }
+                    whatsappOrdersEnabled={!!singleBranch?.whatsappOrdersEnabled}
+                    deliveryUrl={singleBranch?.deliveryUrl ?? null}
+                    pickupEnabled={!!singleBranch?.pickupEnabled || hasCategory(b, "svc_pickup")}
+                    deliveryEnabled={
+                      !!singleBranch?.deliveryEnabled || hasCategory(b, "svc_delivery")
+                    }
+                    menuItems={menuItems}
+                    lang={lang}
+                  />
+                )}
               </aside>
             </div>
           </div>

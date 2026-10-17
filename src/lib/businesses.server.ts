@@ -12,6 +12,7 @@ import {
   type LinkPlatform,
   type OpeningHours,
 } from "@/data/businesses";
+import type { BusinessContactInput } from "./businesses.schemas";
 
 export function publicClient() {
   const url = process.env["SUPABASE_URL"];
@@ -46,6 +47,52 @@ export const PUBLIC_BUSINESS_COLUMNS =
 // this instead of select("*")/bare select() — those now fail outright for any role without a
 // blanket table-level grant, which no longer exists on this table after the billing-column fix.
 export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},needs_review,review_notes`;
+
+/**
+ * The 4 business-level contact fields — shared by both the admin page and the owner portal (the
+ * caller is responsible for its own authorization check before calling this). website/instagram
+ * are plain `businesses` columns; tiktok/email upsert (or remove, when cleared) a business-level
+ * (branch_id null) business_links row, kept to one-per-platform by business_links_business_level_unique.
+ */
+export async function saveBusinessContact(client: SupabaseClient, input: BusinessContactInput) {
+  const { business_id, website, instagram, tiktok, email } = input;
+  const { error: bizError } = await client
+    .from("businesses")
+    .update({ website, instagram })
+    .eq("id", business_id);
+  if (bizError) throw new Error(bizError.message);
+
+  for (const [platform, url] of [
+    ["tiktok", tiktok],
+    ["email", email],
+  ] as const) {
+    if (url) {
+      const { error } = await client
+        .from("business_links")
+        .upsert(
+          { business_id, branch_id: null, platform, url, sort_order: 0 },
+          { onConflict: "business_id,platform" },
+        );
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await client
+        .from("business_links")
+        .delete()
+        .eq("business_id", business_id)
+        .is("branch_id", null)
+        .eq("platform", platform);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  const { data, error } = await client
+    .from("businesses")
+    .select(AUTHENTICATED_BUSINESS_COLUMNS)
+    .eq("id", business_id)
+    .single();
+  if (error) throw new Error(error.message);
+  return { ...data, tiktok: tiktok ?? null, email: email ?? null };
+}
 
 function mapLink(link: Record<string, unknown>): BusinessLink {
   return {
@@ -96,6 +143,10 @@ function mapBranch(row: Record<string, unknown>, links: BusinessLink[] = []): Br
     permanentlyClosed: !!row.permanently_closed,
     sort_order: typeof row.sort_order === "number" ? row.sort_order : 0,
     links: links.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    pickupEnabled: !!row.pickup_enabled,
+    deliveryEnabled: !!row.delivery_enabled,
+    deliveryUrl: str(row.delivery_url),
+    whatsappOrdersEnabled: !!row.whatsapp_orders_enabled,
   };
 }
 
