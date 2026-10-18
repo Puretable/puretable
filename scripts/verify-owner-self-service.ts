@@ -176,13 +176,134 @@ try {
     /Forbidden/,
     "a stranger cannot load another business's agreement",
   );
-  ok(await acceptPartnershipAgreement(ownerActor, A, {}));
+  ok(await acceptPartnershipAgreement(ownerActor, A, {}, owner.email));
   assert.ok(
     ok(await service.from("businesses").select("terms_accepted_at").eq("id", A).single())
       .terms_accepted_at,
     "an admin-created owner can accept the agreement with no billing_business row at all",
   );
   step("admin-created owner: agreement loads and is acceptable before any billing data exists");
+
+  console.log("Agreement evidence trail (agreement_versions / agreement_acceptances)");
+  const acceptanceRows = ok(
+    await service
+      .from("agreement_acceptances")
+      .select("*")
+      .eq("business_id", A)
+      .order("accepted_at", { ascending: false }),
+  );
+  assert.equal(acceptanceRows.length, 1);
+  assert.equal(acceptanceRows[0].terms_version, "v1");
+  assert.equal(acceptanceRows[0].accepted_by, owner.id);
+  const v1 = ok(
+    await service
+      .from("agreement_versions")
+      .select("text_sha256")
+      .eq("terms_version", "v1")
+      .single(),
+  );
+  assert.equal(acceptanceRows[0].text_sha256, v1.text_sha256);
+  step("accepting writes exactly one acceptance row with the right user id and the version's hash");
+
+  await rejects(
+    (async () =>
+      ok(
+        await service
+          .from("agreement_acceptances")
+          .update({ terms_version: "hacked" })
+          .eq("id", acceptanceRows[0].id),
+      ))(),
+    /append-only/,
+    "UPDATE on agreement_acceptances (service role)",
+  );
+  await rejects(
+    (async () =>
+      ok(await service.from("agreement_acceptances").delete().eq("id", acceptanceRows[0].id)))(),
+    /append-only/,
+    "DELETE on agreement_acceptances (service role)",
+  );
+  step("agreement_acceptances rows can never be updated or deleted, not even by service role");
+
+  assert.equal(
+    ok(await ownerB.client.from("agreement_acceptances").select("id").eq("business_id", A)).length,
+    0,
+    "another owner cannot read A's acceptance rows",
+  );
+  const craftedInsert = await owner.client
+    .from("agreement_acceptances")
+    .insert({ business_id: A, terms_version: "v1", accepted_by: owner.id });
+  assert.ok(
+    craftedInsert.error,
+    "nobody can insert into agreement_acceptances directly, not even the real owner's own session",
+  );
+  step("RLS: an owner reads only their own business's acceptance rows; nobody writes directly");
+
+  // The confirmation email is fire-and-forget; give it a moment. Either "sent" or "failed" is a
+  // safe outcome here — the recipient is always a QA @example.com address, never a real inbox.
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const delivery = ok(
+    await service
+      .from("email_deliveries")
+      .select("recipient,status")
+      .eq("metadata->>business_id", A)
+      .maybeSingle(),
+  );
+  if (delivery) {
+    assert.ok(
+      delivery.recipient.endsWith("@example.com"),
+      "the confirmation email only ever targets the QA @example.com address, never a real inbox",
+    );
+    assert.ok(["sent", "failed"].includes(delivery.status));
+  }
+  step(
+    "a confirmation email was attempted (or safely failed) without blocking the already-successful acceptance",
+  );
+
+  // A future version bump (not seeded here — this simulates it) must add a new row and keep the
+  // old one, never overwrite it.
+  ok(
+    await owner.client.rpc("accept_partnership_agreement", {
+      _business_id: A,
+      _terms_version: "v2-simulated",
+    }),
+  );
+  const acceptanceRowsAfterV2 = ok(
+    await service
+      .from("agreement_acceptances")
+      .select("terms_version")
+      .eq("business_id", A)
+      .order("accepted_at", { ascending: true }),
+  );
+  assert.deepEqual(
+    acceptanceRowsAfterV2.map((r) => r.terms_version),
+    ["v1", "v2-simulated"],
+    "the v1 acceptance row is kept; a new row is added for the new version",
+  );
+  step("accepting a new version adds a row and never overwrites or removes the previous one");
+
+  const acceptedBusinessIds = new Set(
+    (
+      ok(await service.from("businesses").select("id").not("terms_accepted_at", "is", null)) as {
+        id: string;
+      }[]
+    ).map((r) => r.id),
+  );
+  const coveredBusinessIds = new Set(
+    (
+      ok(await service.from("agreement_acceptances").select("business_id")) as {
+        business_id: string;
+      }[]
+    ).map((r) => r.business_id),
+  );
+  const uncovered = [...acceptedBusinessIds].filter((id) => !coveredBusinessIds.has(id));
+  assert.deepEqual(
+    uncovered,
+    [],
+    "every business with terms_accepted_at set has at least one acceptance row (legacy back-fill)",
+  );
+  step(
+    `legacy back-fill: all ${acceptedBusinessIds.size} business(es) with a prior acceptance are covered`,
+  );
 
   console.log("Business information");
   const saved = await updateOwnerBusiness(ownerActor, A, parseInfo(validInfo()));

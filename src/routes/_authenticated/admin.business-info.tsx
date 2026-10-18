@@ -206,6 +206,29 @@ function Row({ row }: { row: BusinessBillingRow }) {
               />
               <CopyField label="إصدار الاتفاقية الموافق عليه" value={row.terms_version} />
             </div>
+            <div className="mt-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                سجل الموافقات (لا يمكن تعديله أو حذفه)
+              </p>
+              {row.acceptance_history.length === 0 ? (
+                <p className="mt-1 text-xs text-muted-foreground">لا توجد موافقات مسجّلة بعد.</p>
+              ) : (
+                <ul className="mt-1.5 space-y-1">
+                  {row.acceptance_history.map((a, i) => (
+                    <li
+                      key={`${a.terms_version}-${a.accepted_at}-${i}`}
+                      className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 text-xs"
+                    >
+                      <span className="font-medium">{a.terms_version}</span>
+                      <span className="text-muted-foreground">{formatDate(a.accepted_at)}</span>
+                      <span dir="ltr" className="text-muted-foreground">
+                        {a.accepted_by_email ?? "قديم (قبل تفعيل هذا السجل)"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </td>
         </tr>
       )}

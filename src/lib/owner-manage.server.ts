@@ -221,12 +221,41 @@ export async function acceptPartnershipAgreement(
   actor: Actor,
   businessId: string,
   _input: Omit<AcceptAgreementInput, "business_id">,
+  email: string | null,
 ) {
   const { error } = await actor.userClient.rpc("accept_partnership_agreement", {
     _business_id: businessId,
     _terms_version: AGREEMENT_TERMS_VERSION,
   });
   if (error) throw agreementError("accept", error.message);
+
+  // Best-effort confirmation email: the acceptance above has already succeeded in the database, so
+  // a failed or slow email must never undo it or surface as an error to the owner.
+  if (email) {
+    void (async () => {
+      try {
+        const { data: business } = await actor.adminClient
+          .from("businesses")
+          .select("name")
+          .eq("id", businessId)
+          .single();
+        if (!business) return;
+        const { notifyAgreementAccepted } = await import("./email.server");
+        await notifyAgreementAccepted({
+          businessId,
+          businessName: business.name,
+          ownerEmail: email,
+          termsVersion: AGREEMENT_TERMS_VERSION,
+          acceptedAt: new Date(),
+        });
+      } catch (e) {
+        console.error(
+          `[agreement:email] confirmation email failed for business ${businessId}`,
+          e instanceof Error ? e.message : e,
+        );
+      }
+    })();
+  }
   return { ok: true as const };
 }
 

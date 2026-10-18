@@ -64,8 +64,11 @@ export const getOwnerBusiness = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Forbidden");
-    const links = (row as unknown as { business_links: { platform: string; branch_id: string | null; url: string }[] })
-      .business_links;
+    const links = (
+      row as unknown as {
+        business_links: { platform: string; branch_id: string | null; url: string }[];
+      }
+    ).business_links;
     return {
       ...row,
       tiktok: links.find((l) => l.platform === "tiktok" && !l.branch_id)?.url ?? null,
@@ -104,7 +107,9 @@ export const acceptPartnershipAgreementFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AcceptAgreementInput.parse(input))
   .handler(async ({ data, context }) => {
     const { business_id, ...rest } = data;
-    return acceptPartnershipAgreement(await actorFor(context), business_id, rest);
+    const claims = (context as { claims?: { email?: unknown } }).claims;
+    const email = typeof claims?.email === "string" ? claims.email : null;
+    return acceptPartnershipAgreement(await actorFor(context), business_id, rest, email);
   });
 
 export const saveOwnerPhotosFn = createServerFn({ method: "POST" })
