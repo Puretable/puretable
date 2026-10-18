@@ -25,6 +25,7 @@ import { LinksEditor } from "@/components/admin/LinksEditor";
 import { MAIN_CITIES, findCity, regionForCity } from "@/lib/saudi";
 import { adminListPlaceCategories } from "@/lib/category.functions";
 import { useSiteText } from "@/hooks/use-site-settings";
+import { pickBilingual } from "@/lib/bilingual";
 
 import { logAudit } from "@/lib/audit";
 import { getBusinessReport } from "@/lib/analytics.dashboard.functions";
@@ -146,6 +147,10 @@ function EditBusiness() {
       setForm({
         ...DEFAULT_FORM,
         ...existing,
+        // One box per field: prefill from whichever language already has text (Arabic first).
+        name: pickBilingual((existing as any).name_ar, existing.name),
+        description: pickBilingual((existing as any).description_ar, existing.description),
+        address: pickBilingual((existing as any).address_ar, (existing as any).address),
         categories: [
           ...new Set(
             [
@@ -241,6 +246,12 @@ function EditBusiness() {
       const payload = { ...form };
       payload.published = publish;
       payload.region = regionKey;
+      // One box per field: name/description/address are a single input here (no separate Arabic
+      // box), so the same text is mirrored into the _ar column on save — see BusinessInfoForm.tsx
+      // (owner portal) for the same pattern.
+      payload.name_ar = payload.name;
+      payload.description_ar = payload.description;
+      payload.address_ar = payload.address;
       payload.category = selectedSubs[0];
       payload.categories = selectedCategories;
       payload.offers_booking = mainOptions.some(
@@ -758,18 +769,9 @@ function EditBusiness() {
               </span>
             </span>
           </label>
-          <Input label="Phone" value={form.phone ?? ""} onChange={(v) => up("phone", v)} />
-          <Input
-            label="واتساب / WhatsApp (رقم أو رابط)"
-            value={form.whatsapp ?? ""}
-            onChange={(v) => up("whatsapp", v)}
-          />
-          <Input
-            label="Instagram handle (without @)"
-            value={form.instagram ?? ""}
-            onChange={(v) => up("instagram", v)}
-          />
-          <Input label="Website" value={form.website ?? ""} onChange={(v) => up("website", v)} />
+          {/* Phone, WhatsApp, website, Instagram, TikTok, email and directions moved to the
+              per-branch fields below and the "طرق التواصل المشتركة" section — editing them here
+              used to silently diverge from what the public page actually reads. */}
           {/* Shared kitchen (orange dot) now lives with the safety level options above. */}
 
           {!form.no_location && (
@@ -780,14 +782,8 @@ function EditBusiness() {
                 onChange={(v) => up("address", v)}
                 className="sm:col-span-2"
               />
-              {/* Coordinates are set by the map picker below, never typed by hand. */}
-
-              <Input
-                label="Directions link (paste from Directions)"
-                value={form.maps_url ?? ""}
-                onChange={(v) => up("maps_url", v)}
-                className="sm:col-span-2"
-              />
+              {/* Coordinates are set by the map picker below, never typed by hand. Directions
+                  links are per-branch now (see "الفروع" below). */}
               <LocationPicker
                 lat={form.lat}
                 lng={form.lng}
@@ -799,7 +795,7 @@ function EditBusiness() {
       </Section>
 
       {!isNew && (
-        <Section title="تيك توك والبريد الإلكتروني / TikTok & email (business-level)">
+        <Section title="طرق التواصل المشتركة (business-level)">
           <BusinessContactEditor
             businessId={id}
             website={form.website ?? null}
@@ -821,6 +817,7 @@ function EditBusiness() {
             city={form.city}
             existing={branches}
             plan={selectedPlan}
+            businessWhatsapp={form.whatsapp}
             onSave={async (row) => {
               await saveBranch({ data: row });
               await qc.invalidateQueries({ queryKey: ["admin-business", id] });

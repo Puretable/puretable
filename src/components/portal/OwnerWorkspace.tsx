@@ -141,6 +141,7 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
               city={row.city}
               existing={branches}
               plan={overview.plan}
+              businessWhatsapp={row.whatsapp}
               onSave={async (branch) => {
                 await friendly(saveBranch({ data: branch as OwnerBranchInput }));
                 await refresh();

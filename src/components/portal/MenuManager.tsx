@@ -12,6 +12,7 @@ import {
 } from "@/lib/owner-manage.schemas";
 import { friendlyPortalError } from "@/lib/owner-portal";
 import { validateImageFile } from "@/lib/image-upload";
+import { pickBilingual } from "@/lib/bilingual";
 
 export type MenuManagerProps = {
   businessId: string;
@@ -27,9 +28,7 @@ export type MenuManagerProps = {
 type Draft = {
   id?: string;
   name: string;
-  name_ar: string;
   description: string;
-  description_ar: string;
   price: string;
   photo_url: string | null;
   safety: MenuSafety;
@@ -37,13 +36,12 @@ type Draft = {
 
 const EMPTY: Draft = {
   name: "",
-  name_ar: "",
   description: "",
-  description_ar: "",
   price: "",
   photo_url: null,
   safety: "red",
 };
+
 
 /**
  * Gluten-free menu editor. Same component for owners (portal) and admins (business page): the caller
@@ -71,10 +69,8 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
       item
         ? {
             id: item.id,
-            name: item.name,
-            name_ar: item.name_ar ?? "",
-            description: item.description ?? "",
-            description_ar: item.description_ar ?? "",
+            name: pickBilingual(item.name_ar, item.name),
+            description: pickBilingual(item.description_ar, item.description),
             price: item.price === null ? "" : String(item.price),
             photo_url: item.photo_url,
             safety: item.safety,
@@ -115,9 +111,9 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
       id: draft.id,
       business_id: businessId,
       name: draft.name,
-      name_ar: draft.name_ar,
+      name_ar: draft.name,
       description: draft.description,
-      description_ar: draft.description_ar,
+      description_ar: draft.description,
       price,
       photo_url: draft.photo_url,
       safety: draft.safety,
@@ -207,43 +203,22 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
           </div>
           <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              اسم الصنف (English) *
+              اسم الصنف *
               <input
                 required
                 maxLength={120}
-                dir="ltr"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 className="mt-2 w-full rounded-xl border bg-background p-3"
               />
             </label>
             <label className="block text-sm">
-              اسم الصنف بالعربية
-              <input
-                maxLength={120}
-                value={draft.name_ar}
-                onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })}
-                className="mt-2 w-full rounded-xl border bg-background p-3"
-              />
-            </label>
-            <label className="block text-sm">
-              وصف الصنف (English)
+              وصف الصنف
               <textarea
                 maxLength={500}
                 rows={3}
-                dir="ltr"
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                className="mt-2 w-full rounded-xl border bg-background p-3"
-              />
-            </label>
-            <label className="block text-sm">
-              وصف الصنف بالعربية
-              <textarea
-                maxLength={500}
-                rows={3}
-                value={draft.description_ar}
-                onChange={(e) => setDraft({ ...draft, description_ar: e.target.value })}
                 className="mt-2 w-full rounded-xl border bg-background p-3"
               />
             </label>

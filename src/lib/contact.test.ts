@@ -3,8 +3,10 @@ import { describe, test } from "node:test";
 
 import {
   WHATSAPP_INQUIRY_MESSAGE,
+  composeOrderMessage,
   encodeWhatsappText,
   pureTableWhatsAppMessage,
+  shouldShowOrderButton,
   whatsappHref,
   withPureTableUtm,
 } from "@/lib/contact";
@@ -71,6 +73,43 @@ describe("business WhatsApp inquiry message", () => {
     assert.equal(whatsappHref("", MESSAGE), null);
     assert.equal(whatsappHref("123", MESSAGE), null);
     assert.equal(whatsappHref(null, MESSAGE), null);
+  });
+});
+
+describe("branch pickup/delivery WhatsApp ordering", () => {
+  test("the pickup button opens WhatsApp with the greeting, the chosen method, and selected items", () => {
+    const message = composeOrderMessage({
+      orderMethodLabel: "طريقة الطلب",
+      methodLabel: "استلام من المنشأة",
+      itemsLabel: "الأصناف",
+      items: ["- كيك الشوكولاتة ×2"],
+    });
+    const href = whatsappHref("0501234567", message)!;
+    const url = new URL(href);
+    assert.equal(url.origin + url.pathname, "https://wa.me/966501234567");
+    assert.equal(
+      url.searchParams.get("text"),
+      `${MESSAGE}\nطريقة الطلب: استلام من المنشأة\nالأصناف:\n- كيك الشوكولاتة ×2`,
+    );
+  });
+
+  test("the delivery button carries its own method label, independent of pickup", () => {
+    const message = composeOrderMessage({
+      orderMethodLabel: "Order method",
+      methodLabel: "Delivery",
+      itemsLabel: "Items",
+      items: [],
+    });
+    assert.equal(message, `${MESSAGE}\nOrder method: Delivery`);
+  });
+
+  test("a button shows only when its option is enabled AND a WhatsApp number exists", () => {
+    assert.equal(shouldShowOrderButton(true, "0501234567"), true);
+    assert.equal(shouldShowOrderButton(false, "0501234567"), false);
+    assert.equal(shouldShowOrderButton(true, null), false);
+    assert.equal(shouldShowOrderButton(true, undefined), false);
+    assert.equal(shouldShowOrderButton(true, ""), false);
+    assert.equal(shouldShowOrderButton(true, "   "), false);
   });
 });
 

@@ -14,8 +14,9 @@ type IconButton = {
 
 /**
  * A single row of small, square, icon-only contact buttons. Shows only what the business filled
- * in. WhatsApp appears here ONLY when the branch's WhatsApp-orders toggle is off (otherwise it's
- * the large order button in the ordering box instead — never both, see hasWhatsappOrders).
+ * in. WhatsApp appears here ONLY when this branch has neither pickup nor delivery enabled
+ * (otherwise it's the pickup/delivery buttons in the ordering box instead — never both, see
+ * suppressWhatsappIcon).
  */
 export function ContactIconsRow({
   businessSlug,
@@ -26,7 +27,7 @@ export function ContactIconsRow({
   phone,
   email,
   whatsappNumber,
-  hasWhatsappOrders,
+  suppressWhatsappIcon,
 }: {
   businessSlug: string;
   mapsHref?: string | null;
@@ -36,8 +37,8 @@ export function ContactIconsRow({
   phone?: string | null;
   email?: string | null;
   whatsappNumber?: string | null;
-  /** When true, WhatsApp is the ordering box's big button instead of a plain icon here. */
-  hasWhatsappOrders: boolean;
+  /** When true, the ordering box already offers WhatsApp via its pickup/delivery buttons. */
+  suppressWhatsappIcon: boolean;
 }) {
   const { t } = useTranslation();
   const tracked = (to: string, type: string, platform: string) =>
@@ -49,8 +50,8 @@ export function ContactIconsRow({
       key: "maps",
       href: mapsHref,
       icon: MapPin,
-      ar: "الموقع على الخريطة",
-      en: "Location",
+      ar: "الاتجاهات",
+      en: "Directions",
       platform: "maps",
       eventType: "click_maps",
     });
@@ -104,7 +105,7 @@ export function ContactIconsRow({
       platform: "email",
       eventType: "click_link",
     });
-  if (whatsappNumber && !hasWhatsappOrders)
+  if (whatsappNumber && !suppressWhatsappIcon)
     buttons.push({
       key: "whatsapp",
       href: tracked(

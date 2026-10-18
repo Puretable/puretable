@@ -29,15 +29,17 @@ export function ContactOrderingPreview({
           tiktok={business.tiktok}
           email={business.email}
           phone={multi ? null : (singleBranch?.phone ?? null)}
-          whatsappNumber={multi ? null : (singleBranch?.whatsapp ?? null)}
-          hasWhatsappOrders={multi ? false : !!singleBranch?.whatsapp_orders_enabled}
+          whatsappNumber={
+            multi ? null : (singleBranch?.whatsapp ?? business.whatsapp ?? null)
+          }
+          suppressWhatsappIcon={
+            multi ? false : !!singleBranch?.pickup_enabled || !!singleBranch?.delivery_enabled
+          }
         />
         {!multi && (
           <OrderContactBox
             businessSlug={business.slug}
-            whatsappNumber={singleBranch?.whatsapp ?? null}
-            whatsappOrdersEnabled={!!singleBranch?.whatsapp_orders_enabled}
-            deliveryUrl={singleBranch?.delivery_url ?? null}
+            whatsappNumber={singleBranch?.whatsapp ?? business.whatsapp ?? null}
             pickupEnabled={!!singleBranch?.pickup_enabled}
             deliveryEnabled={!!singleBranch?.delivery_enabled}
             menuItems={menuItems}
@@ -46,7 +48,8 @@ export function ContactOrderingPreview({
         )}
         {!multi && !singleBranch && (
           <p className="text-xs text-muted-foreground">
-            أضف فرعاً من تبويب «الفروع» ليظهر هنا هاتفك وواتساب ومابس وخيارات الاستلام/التوصيل.
+            أضف فرعاً من تبويب «الفروع» ليظهر هنا هاتفك وواتساب والموقع والاتجاهات وخيارات
+            الاستلام/التوصيل.
           </p>
         )}
       </div>
@@ -61,14 +64,12 @@ export function ContactOrderingPreview({
                 businessSlug={business.slug}
                 mapsHref={br.maps_url}
                 phone={br.phone}
-                whatsappNumber={br.whatsapp}
-                hasWhatsappOrders={!!br.whatsapp_orders_enabled}
+                whatsappNumber={br.whatsapp ?? business.whatsapp ?? null}
+                suppressWhatsappIcon={!!br.pickup_enabled || !!br.delivery_enabled}
               />
               <OrderContactBox
                 businessSlug={business.slug}
-                whatsappNumber={br.whatsapp}
-                whatsappOrdersEnabled={!!br.whatsapp_orders_enabled}
-                deliveryUrl={br.delivery_url}
+                whatsappNumber={br.whatsapp ?? business.whatsapp ?? null}
                 pickupEnabled={!!br.pickup_enabled}
                 deliveryEnabled={!!br.delivery_enabled}
                 menuItems={menuItems}

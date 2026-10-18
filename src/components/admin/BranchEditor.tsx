@@ -5,6 +5,7 @@ import type { z } from "zod";
 import { BranchInput } from "@/lib/businesses.schemas";
 import { branchLimitLabel, remainingBranchSlots, type PlanTier } from "@/lib/plans";
 import { LocationPicker } from "./LocationPicker";
+import { pickBilingual } from "@/lib/bilingual";
 
 // maps_url/phone/whatsapp/delivery_url use a normalizing validator (z.preprocess), so their z.input
 // type is "unknown" — fine for parsing, not for a plain text input's value. Overridden here to the
@@ -27,15 +28,13 @@ const DAYS = [
   ["fri", "الجمعة"],
   ["sat", "السبت"],
 ] as const;
+// One box per field: a single input covers both languages — see save() below, which mirrors
+// each value into its _ar counterpart so neither column goes stale.
 const FIELDS = [
   ["name", "اسم الفرع"],
-  ["name_ar", "الاسم بالعربية"],
   ["city", "المدينة"],
-  ["city_ar", "المدينة بالعربية"],
   ["district", "الحي"],
-  ["district_ar", "الحي بالعربية"],
   ["address", "العنوان"],
-  ["address_ar", "العنوان بالعربية"],
 ] as const;
 
 export function BranchEditor({
@@ -43,6 +42,7 @@ export function BranchEditor({
   city,
   existing,
   plan,
+  businessWhatsapp,
   onSave,
   onDelete,
 }: {
@@ -50,6 +50,8 @@ export function BranchEditor({
   city: string;
   existing: Branch[];
   plan: PlanTier;
+  /** Legacy business-level WhatsApp number, used only as a fallback for the missing-number warning. */
+  businessWhatsapp?: string | null;
   onSave: (branch: Branch) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
@@ -70,7 +72,13 @@ export function BranchEditor({
     setError(null);
     setMessage("");
     try {
-      const parsed = BranchInput.safeParse(draft);
+      const parsed = BranchInput.safeParse({
+        ...draft,
+        name_ar: draft.name,
+        city_ar: draft.city,
+        district_ar: draft.district,
+        address_ar: draft.address,
+      });
       if (!parsed.success) throw new Error("راجع اسم الفرع والإحداثيات والحقول المطلوبة.");
       const normalize = (s?: string | null) => (s || "").trim().toLocaleLowerCase();
       if (
@@ -143,7 +151,14 @@ export function BranchEditor({
             disabled={busy}
             className="rounded border px-3 py-1"
             onClick={() => {
-              setDraft({ ...branch, hours: { ...branch.hours } });
+              setDraft({
+                ...branch,
+                hours: { ...branch.hours },
+                name: pickBilingual(branch.name_ar, branch.name),
+                city: pickBilingual(branch.city_ar, branch.city),
+                district: pickBilingual(branch.district_ar, branch.district),
+                address: pickBilingual(branch.address_ar, branch.address),
+              });
               setError(null);
             }}
           >
@@ -255,7 +270,7 @@ export function BranchEditor({
                 />
               </label>
               <label className="grid gap-1 text-sm sm:col-span-2">
-                رابط الاتجاهات (مابس) — https فقط
+                الموقع والاتجاهات — https فقط
                 <input
                   dir="ltr"
                   placeholder="https://"
@@ -273,22 +288,6 @@ export function BranchEditor({
               <input
                 type="checkbox"
                 className="mt-0.5"
-                checked={draft.whatsapp_orders_enabled ?? false}
-                onChange={(e) => setDraft({ ...draft, whatsapp_orders_enabled: e.target.checked })}
-              />
-              <span>
-                نستقبل الطلبات عبر واتساب
-                {draft.whatsapp_orders_enabled && !draft.whatsapp?.trim() && (
-                  <span className="mt-1 block text-xs text-destructive">
-                    أدخل رقم واتساب أعلاه أولاً حتى يظهر زر الطلب للزوار.
-                  </span>
-                )}
-              </span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5"
                 checked={draft.pickup_enabled ?? false}
                 onChange={(e) => setDraft({ ...draft, pickup_enabled: e.target.checked })}
               />
@@ -301,20 +300,19 @@ export function BranchEditor({
                 checked={draft.delivery_enabled ?? false}
                 onChange={(e) => setDraft({ ...draft, delivery_enabled: e.target.checked })}
               />
-              عندنا توصيل
+              توصيل
             </label>
-            {draft.delivery_enabled && (
-              <label className="grid gap-1 text-sm">
-                رابط التوصيل الخاص بالمنشأة (اختياري) — https فقط
-                <input
-                  dir="ltr"
-                  placeholder="https://"
-                  className="rounded-lg border bg-background p-2"
-                  value={draft.delivery_url ?? ""}
-                  onChange={(e) => setDraft({ ...draft, delivery_url: e.target.value })}
-                />
-              </label>
-            )}
+            {(draft.pickup_enabled || draft.delivery_enabled) &&
+              !draft.whatsapp?.trim() &&
+              !businessWhatsapp?.trim() && (
+                <p className="text-xs text-destructive">
+                  أدخل رقم واتساب لهذا الفرع أعلاه حتى تظهر أزرار الطلب للزوار — بدونه لن يستطيع
+                  الزوار إتمام الطلب.
+                </p>
+              )}
+            <p className="text-xs text-muted-foreground">
+              يفتح كل خيار محادثة واتساب مباشرة مع المنشأة عند الطلب أو الاستلام.
+            </p>
           </div>
 
           <label className="flex gap-2 text-sm">

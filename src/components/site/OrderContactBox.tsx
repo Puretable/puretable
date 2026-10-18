@@ -1,23 +1,22 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MessageCircle, Minus, Plus, Truck } from "lucide-react";
+import { Minus, Package, Plus, Truck } from "lucide-react";
 import { goHref } from "@/lib/track";
-import { WHATSAPP_INQUIRY_MESSAGE, whatsappHref } from "@/lib/contact";
+import { composeOrderMessage, shouldShowOrderButton, whatsappHref } from "@/lib/contact";
 import type { MenuItem } from "@/lib/owner-manage.schemas";
 
 /**
- * Ordering & delivery box — shown only when the business (or this branch) enabled ordering,
- * delivery, or pickup. Never rendered otherwise (no empty or misleading boxes). The pre-filled
- * WhatsApp greeting (WHATSAPP_INQUIRY_MESSAGE, see contact.ts) is never changed here — the chosen
- * method, any selected menu items, and a confirm-with-establishment line are only ever appended to
- * it. No selection is stored anywhere: it only exists in this component's state, folded into the
+ * Ordering box — shown only when this branch has pickup and/or delivery enabled. Never rendered
+ * otherwise (no empty or misleading boxes). Each enabled option is its own button that opens
+ * WhatsApp directly: there is no separate "order via WhatsApp" button and no delivery-link button —
+ * pickup and delivery both go through the same WhatsApp chat, with the chosen method folded into
+ * the pre-filled greeting (WHATSAPP_INQUIRY_MESSAGE, see contact.ts), along with any selected menu
+ * items. No selection is stored anywhere: it only exists in this component's state, folded into the
  * WhatsApp message text at the moment the visitor opens the chat.
  */
 export function OrderContactBox({
   businessSlug,
   whatsappNumber,
-  whatsappOrdersEnabled,
-  deliveryUrl,
   pickupEnabled,
   deliveryEnabled,
   menuItems,
@@ -26,22 +25,18 @@ export function OrderContactBox({
   businessSlug: string;
   /** null when there is no number, or the business's plan does not show it. */
   whatsappNumber: string | null;
-  whatsappOrdersEnabled: boolean;
-  deliveryUrl: string | null;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
   menuItems: MenuItem[];
   lang: string;
 }) {
   const { t } = useTranslation();
-  const hasWhatsappButton = whatsappOrdersEnabled && !!whatsappNumber;
-  if (!pickupEnabled && !deliveryEnabled && !hasWhatsappButton) return null;
+  if (!pickupEnabled && !deliveryEnabled) return null;
 
   return (
     <OrderContactBoxInner
       businessSlug={businessSlug}
-      whatsappNumber={hasWhatsappButton ? whatsappNumber : null}
-      deliveryUrl={deliveryEnabled ? deliveryUrl : null}
+      whatsappNumber={whatsappNumber}
       pickupEnabled={pickupEnabled}
       deliveryEnabled={deliveryEnabled}
       menuItems={menuItems}
@@ -54,7 +49,6 @@ export function OrderContactBox({
 function OrderContactBoxInner({
   businessSlug,
   whatsappNumber,
-  deliveryUrl,
   pickupEnabled,
   deliveryEnabled,
   menuItems,
@@ -63,20 +57,12 @@ function OrderContactBoxInner({
 }: {
   businessSlug: string;
   whatsappNumber: string | null;
-  deliveryUrl: string | null;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
   menuItems: MenuItem[];
   lang: string;
   t: (key: string) => string;
 }) {
-  const [method, setMethod] = useState<"pickup" | "delivery" | null>(
-    pickupEnabled && !deliveryEnabled
-      ? "pickup"
-      : deliveryEnabled && !pickupEnabled
-        ? "delivery"
-        : null,
-  );
   const [selected, setSelected] = useState<Record<string, number>>({});
 
   function toggleItem(id: string, checked: boolean) {
@@ -91,38 +77,33 @@ function OrderContactBoxInner({
     setSelected((prev) => ({ ...prev, [id]: Math.max(1, (prev[id] ?? 1) + delta) }));
   }
 
-  function composeMessage(): string {
-    const lines = [WHATSAPP_INQUIRY_MESSAGE];
-    if (method) {
-      const methodLabel = t(
-        method === "pickup" ? "business.pickup_choice" : "business.delivery_choice",
-      );
-      lines.push(`${t("business.order_method_label")}: ${methodLabel}`);
-    }
+  function composeMessage(method: "pickup" | "delivery"): string {
     const itemLines = menuItems
       .filter((item) => selected[item.id])
       .map((item) => {
         const name = lang === "ar" ? item.name_ar || item.name : item.name;
         return `- ${name} ×${selected[item.id]}`;
       });
-    if (itemLines.length) {
-      lines.push(`${t("business.items_label")}:`);
-      lines.push(...itemLines);
-    }
-    return lines.join("\n");
+    return composeOrderMessage({
+      orderMethodLabel: t("business.order_method_label"),
+      methodLabel: t(method === "pickup" ? "business.pickup_choice" : "business.delivery_choice"),
+      itemsLabel: t("business.items_label"),
+      items: itemLines,
+    });
   }
 
-  const waHref = whatsappNumber ? whatsappHref(whatsappNumber, composeMessage()) : null;
-  const waTrackedHref = waHref
-    ? goHref({ to: waHref, type: "click_whatsapp", business: businessSlug, platform: "whatsapp" })
+  function waTrackedHref(method: "pickup" | "delivery"): string | null {
+    const href = whatsappNumber ? whatsappHref(whatsappNumber, composeMessage(method)) : null;
+    return href
+      ? goHref({ to: href, type: "click_whatsapp", business: businessSlug, platform: "whatsapp" })
+      : null;
+  }
+
+  const pickupHref = shouldShowOrderButton(pickupEnabled, whatsappNumber)
+    ? waTrackedHref("pickup")
     : null;
-  const deliveryTrackedHref = deliveryUrl
-    ? goHref({
-        to: deliveryUrl,
-        type: "click_delivery",
-        business: businessSlug,
-        platform: "delivery",
-      })
+  const deliveryHref = shouldShowOrderButton(deliveryEnabled, whatsappNumber)
+    ? waTrackedHref("delivery")
     : null;
 
   return (
@@ -146,7 +127,7 @@ function OrderContactBoxInner({
         </div>
       )}
 
-      {waTrackedHref && menuItems.length > 0 && (
+      {whatsappNumber && menuItems.length > 0 && (
         <div className="mt-4">
           <p className="text-xs text-muted-foreground">{t("business.menu_select_hint")}</p>
           <ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto pe-1">
@@ -194,53 +175,21 @@ function OrderContactBoxInner({
         </div>
       )}
 
-      {waTrackedHref && pickupEnabled && deliveryEnabled && (
-        <div className="mt-4">
-          <p className="text-xs text-muted-foreground">{t("business.choose_method")}</p>
-          <div className="mt-1.5 flex gap-2">
-            <button
-              type="button"
-              aria-pressed={method === "pickup"}
-              onClick={() => setMethod("pickup")}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                method === "pickup"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card"
-              }`}
-            >
-              {t("business.pickup_choice")}
-            </button>
-            <button
-              type="button"
-              aria-pressed={method === "delivery"}
-              onClick={() => setMethod("delivery")}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                method === "delivery"
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card"
-              }`}
-            >
-              {t("business.delivery_choice")}
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="mt-4 space-y-2">
-        {waTrackedHref && (
+        {pickupHref && (
           <a
-            href={waTrackedHref}
+            href={pickupHref}
             target="_blank"
             rel="noreferrer noopener"
             className="flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
-            <MessageCircle className="h-4 w-4" />
-            {t("business.order_via_whatsapp")}
+            <Package className="h-4 w-4" />
+            {t("business.pickup_choice")}
           </a>
         )}
-        {deliveryTrackedHref && (
+        {deliveryHref && (
           <a
-            href={deliveryTrackedHref}
+            href={deliveryHref}
             target="_blank"
             rel="noreferrer noopener"
             className="flex items-center justify-center gap-2 rounded-full border border-primary bg-card px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary-soft"

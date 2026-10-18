@@ -9,6 +9,7 @@ import {
   type OwnerBusinessDetail,
 } from "@/lib/owner-manage.schemas";
 import { friendlyPortalError } from "@/lib/owner-portal";
+import { pickBilingual } from "@/lib/bilingual";
 
 const DAY_LABELS: Record<(typeof DAY_KEYS)[number], string> = {
   sun: "الأحد",
@@ -68,19 +69,16 @@ export function BusinessInfoForm({
 }) {
   const { text } = useSiteText();
   const s = (v: string | null | undefined) => v ?? "";
+  // One box per field: Arabic and English used to be separate inputs writing to separate columns.
+  // Now there is a single box per field, prefilled from whichever language already has text
+  // (Arabic first), and on save the same text is written to both columns — see submit() below.
   const [f, setF] = useState({
-    name: business.name,
-    name_ar: s(business.name_ar),
-    description: s(business.description),
-    description_ar: s(business.description_ar),
-    products: s(business.products),
-    products_ar: s(business.products_ar),
-    city: business.city,
-    city_ar: s(business.city_ar),
-    district: s(business.district),
-    district_ar: s(business.district_ar),
-    address: s(business.address),
-    address_ar: s(business.address_ar),
+    name: pickBilingual(business.name_ar, business.name),
+    description: pickBilingual(business.description_ar, business.description),
+    products: pickBilingual(business.products_ar, business.products),
+    city: pickBilingual(business.city_ar, business.city),
+    district: pickBilingual(business.district_ar, business.district),
+    address: pickBilingual(business.address_ar, business.address),
     discount_code: s(business.discount_code),
     lat: business.lat,
     lng: business.lng,
@@ -103,18 +101,18 @@ export function BusinessInfoForm({
     if (busy || disabled) return;
     const parsed = OwnerBusinessInput.safeParse({
       name: f.name,
-      name_ar: f.name_ar,
+      name_ar: f.name,
       description: f.description,
-      description_ar: f.description_ar,
+      description_ar: f.description,
       products: f.products,
-      products_ar: f.products_ar,
+      products_ar: f.products,
       region: business.region,
       city: f.city,
-      city_ar: f.city_ar,
+      city_ar: f.city,
       district: f.district,
-      district_ar: f.district_ar,
+      district_ar: f.district,
       address: f.address,
-      address_ar: f.address_ar,
+      address_ar: f.address,
       lat: f.lat,
       lng: f.lng,
       hours: Object.fromEntries(Object.entries(f.hours).filter(([, v]) => v.trim() !== "")),
@@ -196,57 +194,29 @@ export function BusinessInfoForm({
       <fieldset disabled={busy || disabled} className="space-y-6">
         <Card title="المعلومات الأساسية">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="اسم العمل (English) *">
+            <Field label="اسم العمل *">
               <input
                 required
-                dir="ltr"
                 maxLength={200}
                 value={f.name}
                 onChange={(e) => set("name", e.target.value)}
                 className={inputClass}
               />
             </Field>
-            <Field label="اسم العمل بالعربية">
-              <input
-                maxLength={200}
-                value={f.name_ar}
-                onChange={(e) => set("name_ar", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="الوصف (English)">
+            <Field label="الوصف">
               <textarea
                 rows={4}
                 maxLength={5000}
-                dir="ltr"
                 value={f.description}
                 onChange={(e) => set("description", e.target.value)}
                 className={inputClass}
               />
             </Field>
-            <Field label="الوصف بالعربية">
-              <textarea
-                rows={4}
-                maxLength={5000}
-                value={f.description_ar}
-                onChange={(e) => set("description_ar", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="ما تقدمه (نص حر، English)" hint="مثال: خبز، كيك، معجنات">
+            <Field label="ما تقدمه (نص حر)" hint="مثال: خبز، كيك، معجنات">
               <input
                 maxLength={2000}
-                dir="ltr"
                 value={f.products}
                 onChange={(e) => set("products", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="ما تقدمه بالعربية">
-              <input
-                maxLength={2000}
-                value={f.products_ar}
-                onChange={(e) => set("products_ar", e.target.value)}
                 className={inputClass}
               />
             </Field>
@@ -295,26 +265,12 @@ export function BusinessInfoForm({
               "لا تظهر أي نقطة على صفحتك.",
             )}
           </div>
-          {f.shared_kitchen && (
-            <Field label="نص المطبخ المشترك (يظهر للزائر)">
-              <p className="mt-2 rounded-xl border bg-secondary/40 p-3 text-sm text-muted-foreground">
-                {business.precautions_note?.trim() || "لم تُدخل الإدارة نصاً بعد."}
-              </p>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                هذا النص تحدّده إدارة Pure Table فقط — تواصل معنا إن احتجت تعديله.
-              </span>
-            </Field>
-          )}
           <p className="text-xs text-muted-foreground">
             هذه المعلومة مقدَّمة من المنشأة ولا تتحقق منها Pure Table. تأكد من دقتها.
           </p>
         </Card>
 
-        <Card title="التواصل">
-          <p className="text-xs text-muted-foreground">
-            الهاتف وواتساب والموقع الإلكتروني وإنستغرام وتيك توك والبريد الإلكتروني ومابس وخيارات
-            الاستلام والتوصيل انتقلت إلى تبويب «التواصل والطلب».
-          </p>
+        <Card title="أكواد الخصم">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="كود الخصم النشط (اختياري)" hint="كود واحد فقط. اتركه فارغاً لإيقافه.">
               <input
@@ -345,55 +301,28 @@ export function BusinessInfoForm({
           {!f.no_location && (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المدينة (English) *">
+                <Field label="المدينة *">
                   <input
                     required
-                    dir="ltr"
                     maxLength={100}
                     value={f.city}
                     onChange={(e) => set("city", e.target.value)}
                     className={inputClass}
                   />
                 </Field>
-                <Field label="المدينة بالعربية">
+                <Field label="الحي">
                   <input
-                    maxLength={100}
-                    value={f.city_ar}
-                    onChange={(e) => set("city_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="الحي (English)">
-                  <input
-                    dir="ltr"
                     maxLength={100}
                     value={f.district}
                     onChange={(e) => set("district", e.target.value)}
                     className={inputClass}
                   />
                 </Field>
-                <Field label="الحي بالعربية">
+                <Field label="العنوان">
                   <input
-                    maxLength={100}
-                    value={f.district_ar}
-                    onChange={(e) => set("district_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="العنوان (English)">
-                  <input
-                    dir="ltr"
                     maxLength={300}
                     value={f.address}
                     onChange={(e) => set("address", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="العنوان بالعربية">
-                  <input
-                    maxLength={300}
-                    value={f.address_ar}
-                    onChange={(e) => set("address_ar", e.target.value)}
                     className={inputClass}
                   />
                 </Field>

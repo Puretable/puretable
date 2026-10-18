@@ -361,6 +361,32 @@ try {
   });
   step("owner edits their listing; plan, slug, publish state and category stay untouched");
 
+  // Single box per field: the owner portal now sends the SAME text for a field and its _ar
+  // counterpart (the UI merged the two boxes into one). The server has no opinion on this — it
+  // simply stores whatever it's given — so this confirms both columns end up identical, matching
+  // what the new UI actually sends on every save.
+  const mirroredName = "مقهى الاختبار الموحّد";
+  await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        name: mirroredName,
+        name_ar: mirroredName,
+        description: "نص موحّد",
+        description_ar: "نص موحّد",
+      }),
+    ),
+  );
+  const mirroredRow = ok(
+    await service.from("businesses").select("name,name_ar,description,description_ar").eq("id", A).single(),
+  );
+  assert.equal(mirroredRow.name, mirroredName);
+  assert.equal(mirroredRow.name_ar, mirroredName);
+  assert.equal(mirroredRow.description, "نص موحّد");
+  assert.equal(mirroredRow.description_ar, "نص موحّد");
+  step("single box per field: saving sends the same text to both the plain and the _ar column");
+
   console.log("Safety level stays owner-editable; the shared-kitchen note is admin-only");
   const beforeNote = ok(
     await service
@@ -699,6 +725,27 @@ try {
     "branches: add, edit, delete; plan limit enforced; cannot touch another business's branch by id",
   );
 
+  // Single box per field: the branch editor now sends the SAME text for name/name_ar (and
+  // city/city_ar, address/address_ar) — confirm both columns end up identical.
+  const mirroredBranchName = "فرع العليا الموحّد";
+  await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: mirroredBranchName,
+      name_ar: mirroredBranchName,
+      city: "Riyadh",
+      city_ar: "Riyadh",
+    }),
+  );
+  const mirroredBranchRow = ok(
+    await service.from("business_branches").select("name,name_ar").eq("id", b1.id).single(),
+  );
+  assert.equal(mirroredBranchRow.name, mirroredBranchName);
+  assert.equal(mirroredBranchRow.name_ar, mirroredBranchName);
+  step("single box per field: saving a branch sends the same text to both name and name_ar");
+
   console.log("Order & contact links");
   const l1 = await saveOwnerLink(
     ownerActor,
@@ -976,6 +1023,27 @@ try {
   step(
     "menu: a Pro owner adds and edits items, with all three existing safety colours and optional price",
   );
+
+  // Single box per field: the menu editor now sends the SAME text for name/name_ar — confirm both
+  // columns end up identical.
+  const mirroredItemName = "صنف موحّد";
+  await saveMenuItem(
+    ownerActor,
+    parseMenu({
+      business_id: A,
+      id: item.id,
+      name: mirroredItemName,
+      name_ar: mirroredItemName,
+      price: 30,
+      safety: "green",
+    }),
+  );
+  const mirroredItemRow = ok(
+    await service.from("business_menu_items").select("name,name_ar").eq("id", item.id).single(),
+  );
+  assert.equal(mirroredItemRow.name, mirroredItemName);
+  assert.equal(mirroredItemRow.name_ar, mirroredItemName);
+  step("single box per field: saving a menu item sends the same text to both name and name_ar");
 
   assert.ok(
     (

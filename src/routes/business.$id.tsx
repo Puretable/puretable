@@ -432,9 +432,12 @@ function BusinessDetail() {
                     ? (singleBranch?.whatsapp ?? b.whatsapp ?? null)
                     : null
                 }
-                hasWhatsappOrders={
+                suppressWhatsappIcon={
                   plan.showLinks && !showMultiBranchContact
-                    ? !!singleBranch?.whatsappOrdersEnabled
+                    ? !!singleBranch?.pickupEnabled ||
+                      !!singleBranch?.deliveryEnabled ||
+                      hasCategory(b, "svc_pickup") ||
+                      hasCategory(b, "svc_delivery")
                     : false
                 }
               />
@@ -444,8 +447,6 @@ function BusinessDetail() {
                   whatsappNumber={
                     plan.showLinks ? (singleBranch?.whatsapp ?? b.whatsapp ?? null) : null
                   }
-                  whatsappOrdersEnabled={!!singleBranch?.whatsappOrdersEnabled}
-                  deliveryUrl={singleBranch?.deliveryUrl ?? null}
                   pickupEnabled={!!singleBranch?.pickupEnabled || hasCategory(b, "svc_pickup")}
                   deliveryEnabled={
                     !!singleBranch?.deliveryEnabled || hasCategory(b, "svc_delivery")
@@ -613,14 +614,16 @@ function BusinessDetail() {
                                   platform: "maps",
                                 })}
                                 phone={br.phone ?? null}
-                                whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
-                                hasWhatsappOrders={!!br.whatsappOrdersEnabled}
+                                whatsappNumber={
+                                  plan.showLinks ? (br.whatsapp ?? b.whatsapp ?? null) : null
+                                }
+                                suppressWhatsappIcon={!!br.pickupEnabled || !!br.deliveryEnabled}
                               />
                               <OrderContactBox
                                 businessSlug={b.id}
-                                whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
-                                whatsappOrdersEnabled={!!br.whatsappOrdersEnabled}
-                                deliveryUrl={br.deliveryUrl ?? null}
+                                whatsappNumber={
+                                  plan.showLinks ? (br.whatsapp ?? b.whatsapp ?? null) : null
+                                }
                                 pickupEnabled={!!br.pickupEnabled}
                                 deliveryEnabled={!!br.deliveryEnabled}
                                 menuItems={menuItems}
