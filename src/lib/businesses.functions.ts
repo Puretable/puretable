@@ -219,12 +219,25 @@ export const adminListBusinesses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const { data, error } = await context.supabase
-      .from("businesses")
-      .select(`${AUTHENTICATED_BUSINESS_COLUMNS},business_links(*),business_branches(*)`)
-      .order("created_at", { ascending: false });
+    const [{ data, error }, { data: launchPartners, error: launchPartnersError }] =
+      await Promise.all([
+        context.supabase
+          .from("businesses")
+          .select(`${AUTHENTICATED_BUSINESS_COLUMNS},business_links(*),business_branches(*)`)
+          .order("created_at", { ascending: false }),
+        context.supabase
+          .from("success_partners")
+          .select("business_id")
+          .eq("kind", "business")
+          .eq("active", true),
+      ]);
     if (error) throw new Error(error.message);
-    return data ?? [];
+    if (launchPartnersError) throw new Error(launchPartnersError.message);
+    const launchPartnerIds = new Set((launchPartners ?? []).map((p) => p.business_id));
+    return (data ?? []).map((row) => ({
+      ...row,
+      is_launch_partner: launchPartnerIds.has(row.id),
+    }));
   });
 
 export const adminGetBusiness = createServerFn({ method: "GET" })

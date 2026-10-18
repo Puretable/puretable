@@ -32,6 +32,7 @@ import {
   OwnerPhotosInput,
 } from "../src/lib/owner-manage.schemas";
 import { BusinessContactInput } from "../src/lib/businesses.schemas";
+import { isFeatured } from "../src/lib/services";
 
 const url = process.env["SUPABASE_URL"];
 const ref = process.env["PT_TEST_PROJECT_REF"];
@@ -176,12 +177,32 @@ try {
     /Forbidden/,
     "a stranger cannot load another business's agreement",
   );
+  // Simulate a partner who already accepted v1 before the v2 bump (a raw RPC call with the old
+  // version string — this is what every current real partner's row looks like right now).
+  ok(
+    await owner.client.rpc("accept_partnership_agreement", {
+      _business_id: A,
+      _terms_version: "v1",
+    }),
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("terms_version").eq("id", A).single())
+      .terms_version,
+    "v1",
+    "a pre-bump partner is on v1",
+  );
+
+  // The real gate re-triggers: terms_version ("v1") !== AGREEMENT_TERMS_VERSION ("v2").
   ok(await acceptPartnershipAgreement(ownerActor, A, {}, owner.email));
   assert.ok(
     ok(await service.from("businesses").select("terms_accepted_at").eq("id", A).single())
       .terms_accepted_at,
     "an admin-created owner can accept the agreement with no billing_business row at all",
   );
+  const termsAfterBump = ok(
+    await service.from("businesses").select("terms_version").eq("id", A).single(),
+  ).terms_version;
+  assert.equal(termsAfterBump, "v2", "the real AGREEMENT_TERMS_VERSION constant is v2 on this branch");
   step("admin-created owner: agreement loads and is acceptable before any billing data exists");
 
   console.log("Agreement evidence trail (agreement_versions / agreement_acceptances)");
@@ -190,20 +211,24 @@ try {
       .from("agreement_acceptances")
       .select("*")
       .eq("business_id", A)
-      .order("accepted_at", { ascending: false }),
+      .order("accepted_at", { ascending: true }),
   );
-  assert.equal(acceptanceRows.length, 1);
+  assert.equal(acceptanceRows.length, 2, "the v1 row is kept; a new v2 row is added");
   assert.equal(acceptanceRows[0].terms_version, "v1");
-  assert.equal(acceptanceRows[0].accepted_by, owner.id);
-  const v1 = ok(
+  assert.equal(acceptanceRows[1].terms_version, "v2");
+  assert.equal(acceptanceRows[1].accepted_by, owner.id);
+  const v2 = ok(
     await service
       .from("agreement_versions")
       .select("text_sha256")
-      .eq("terms_version", "v1")
+      .eq("terms_version", "v2")
       .single(),
   );
-  assert.equal(acceptanceRows[0].text_sha256, v1.text_sha256);
-  step("accepting writes exactly one acceptance row with the right user id and the version's hash");
+  assert.equal(acceptanceRows[1].text_sha256, v2.text_sha256);
+  step(
+    "a v1 owner re-prompted by the version bump accepts, is logged as v2 (v1 row untouched), with the version's hash",
+  );
+  const latestAcceptance = acceptanceRows[acceptanceRows.length - 1];
 
   await rejects(
     (async () =>
@@ -259,15 +284,26 @@ try {
     "a confirmation email was attempted (or safely failed) without blocking the already-successful acceptance",
   );
 
-  // A future version bump (not seeded here — this simulates it) must add a new row and keep the
-  // old one, never overwrite it.
+  // Once on v2, the gate's own condition (terms_accepted_at set AND terms_version === current)
+  // is false, so a second real accept call never fires from the UI — it isn't a loop by
+  // construction. Re-reading the row confirms the state that condition checks against.
+  assert.equal(
+    ok(await service.from("businesses").select("terms_version").eq("id", A).single())
+      .terms_version,
+    "v2",
+    "after accepting, the business is on the current version — the gate's re-trigger condition is now false",
+  );
+  step("a business already on the current version is not re-prompted (no loop)");
+
+  // A future version bump beyond v2 (not seeded here — this simulates it) must still add a new row
+  // and keep both older ones, never overwrite them.
   ok(
     await owner.client.rpc("accept_partnership_agreement", {
       _business_id: A,
-      _terms_version: "v2-simulated",
+      _terms_version: "v3-simulated",
     }),
   );
-  const acceptanceRowsAfterV2 = ok(
+  const acceptanceRowsAfterV3 = ok(
     await service
       .from("agreement_acceptances")
       .select("terms_version")
@@ -275,11 +311,11 @@ try {
       .order("accepted_at", { ascending: true }),
   );
   assert.deepEqual(
-    acceptanceRowsAfterV2.map((r) => r.terms_version),
-    ["v1", "v2-simulated"],
-    "the v1 acceptance row is kept; a new row is added for the new version",
+    acceptanceRowsAfterV3.map((r) => r.terms_version),
+    ["v1", "v2", "v3-simulated"],
+    "both earlier acceptance rows are kept; a new row is added for the new version",
   );
-  step("accepting a new version adds a row and never overwrites or removes the previous one");
+  step("accepting a further new version adds a row and never overwrites or removes the previous ones");
 
   const acceptedBusinessIds = new Set(
     (
@@ -1687,6 +1723,81 @@ try {
     "sent",
   );
   step("the admin invoice toggle saves immediately and is admin-only");
+
+  console.log("Featured places (Premium OR launch partner, admin-only)");
+  const featuredPremium = await makeBusiness("featured-premium");
+  const featuredPartner = await makeBusiness("featured-partner");
+  ok(await service.from("businesses").update({ plan: "premium" }).eq("id", featuredPremium));
+  assert.equal(isFeatured({ plan: "free" }), false, "a Free business is not featured");
+  assert.equal(
+    isFeatured(
+      ok(await service.from("businesses").select("plan").eq("id", featuredPremium).single()),
+    ),
+    true,
+    "an active Premium business is featured",
+  );
+  step("Premium active -> featured");
+
+  ok(await service.from("businesses").update({ plan: "free" }).eq("id", featuredPremium));
+  assert.equal(
+    isFeatured(
+      ok(await service.from("businesses").select("plan").eq("id", featuredPremium).single()),
+    ),
+    false,
+    "once suspension/expiry reverts the stored plan to free, it drops out of featured automatically",
+  );
+  step("Premium expired/suspended (plan reverted to free) -> not featured");
+
+  const ownerPartnerInsert = await owner.client
+    .from("success_partners")
+    .insert({ kind: "business", business_id: featuredPartner, name: "x", active: true });
+  assert.ok(ownerPartnerInsert.error, "owner cannot mark a business a launch partner");
+  assert.equal(
+    ok(await service.from("success_partners").select("id").eq("business_id", featuredPartner))
+      .length,
+    0,
+    "the rejected owner insert left no row behind",
+  );
+  step("owner cannot write to success_partners (admin-only RLS)");
+
+  const partnerRow = ok(
+    await staff.client
+      .from("success_partners")
+      .insert({
+        kind: "business",
+        business_id: featuredPartner,
+        name: "QA Partner",
+        active: true,
+      })
+      .select("id")
+      .single(),
+  );
+  assert.equal(
+    isFeatured({ plan: "free", isLaunchPartner: true }),
+    true,
+    "a launch partner is featured even on the Free plan",
+  );
+  step("admin can mark a launch partner, and it is featured without Premium");
+
+  await owner.client.from("success_partners").delete().eq("id", partnerRow.id);
+  assert.equal(
+    ok(await service.from("success_partners").select("id").eq("id", partnerRow.id)).length,
+    1,
+    "owner's delete attempt silently affects zero rows — the launch-partner mark stays",
+  );
+  await owner.client
+    .from("success_partners")
+    .update({ active: false })
+    .eq("id", partnerRow.id);
+  assert.equal(
+    ok(await service.from("success_partners").select("active").eq("id", partnerRow.id).single())
+      .active,
+    true,
+    "owner's update attempt silently affects zero rows — still active",
+  );
+  step("owner cannot change featured status in either direction (RLS denies delete/update)");
+
+  ok(await service.from("success_partners").delete().eq("id", partnerRow.id));
 
   console.log(`\nAll ${checks} checks passed.`);
 } finally {

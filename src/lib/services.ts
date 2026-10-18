@@ -43,10 +43,11 @@ export function serviceBySlug(slug: string) {
 
 /**
  * "Featured places" is automatic: a business appears there while its effective
- * plan (after any platform-wide override) is Premium. Nothing to tick in the editor.
+ * plan (after any platform-wide override) is Premium, or while admin has marked it
+ * a launch partner (success_partners) — whichever comes first. Nothing to tick for Premium.
  */
-export function isFeatured(b: PlanAccess) {
-  return featuresOf(b).featured;
+export function isFeatured(b: PlanAccess & { isLaunchPartner?: boolean }) {
+  return featuresOf(b).featured || !!b.isLaunchPartner;
 }
 
 /** Controlled by the admin toggle, regardless of the eventual booking method. */

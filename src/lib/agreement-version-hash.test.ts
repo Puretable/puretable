@@ -13,6 +13,9 @@ import { AGREEMENT_TERMS_VERSION } from "./owner-manage.schemas";
  */
 const KNOWN_VERSION_HASHES: Record<string, string> = {
   v1: "66dbc857dbd3c883b1c6c83256368fa46c0d729b16ea3f45e3ea357f88e47de7",
+  // Same hash as v1 — the template text hasn't changed; v2 is a deliberate re-confirmation bump,
+  // not a wording change (see supabase/test-sync/20261020_agreement_v2.sql).
+  v2: "66dbc857dbd3c883b1c6c83256368fa46c0d729b16ea3f45e3ea357f88e47de7",
 };
 
 test("the live agreement template's hash matches its recorded version — a text change requires a new version", () => {

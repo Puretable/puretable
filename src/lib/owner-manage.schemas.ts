@@ -142,7 +142,9 @@ export type OwnerLinkInput = z.infer<typeof OwnerLinkInput>;
  *  - BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative. Gates
  *    selecting a paid package (and, while packages are platform-disabled, the dashboard too).
  */
-export const AGREEMENT_TERMS_VERSION = "v1";
+// Bumped to "v2" on this branch only — forces every business to re-accept (the template text is
+// unchanged; see supabase/test-sync/20261020_agreement_v2.sql for why). NOT released to production.
+export const AGREEMENT_TERMS_VERSION = "v2";
 // Only trade name + CR number are hard-required for now (packages/full invoicing details are
 // platform-disabled — see the `packages_enabled` toggle); the rest stay optional here to match the
 // relaxed `save_business_billing_fields` database function, so the full form works unchanged the

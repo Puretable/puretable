@@ -575,6 +575,22 @@ function BusinessesList() {
                         </option>
                       ))}
                     </select>
+                    {(() => {
+                      const premium = ((b as any).plan ?? "free") === "premium";
+                      const partner = !!(b as any).is_launch_partner;
+                      if (!premium && !partner) return null;
+                      const reason =
+                        premium && partner
+                          ? "مميز: Premium + شريك انطلاق"
+                          : premium
+                            ? "مميز: Premium"
+                            : "مميز: شريك انطلاق";
+                      return (
+                        <div className="mt-1 text-[11px] text-muted-foreground" title={reason}>
+                          {reason}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">

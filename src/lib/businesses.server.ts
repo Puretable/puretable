@@ -114,6 +114,7 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
     { data: rows, error: businessesError },
     { data: links, error: linksError },
     { data: branches, error: branchesError },
+    { data: launchPartners, error: launchPartnersError },
     catalog,
     packagesEnabled,
   ] = await Promise.all([
@@ -123,12 +124,17 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
       .order("created_at", { ascending: true }),
     client.from("business_links").select("*"),
     client.from("business_branches").select("*").eq("published", true),
+    client.from("success_partners").select("business_id").eq("kind", "business").eq("active", true),
     readPlanCatalog(client),
     isPackagesEnabled(client),
   ]);
   if (businessesError) throw new Error(businessesError.message);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
+  if (launchPartnersError) throw new Error(launchPartnersError.message);
+  const launchPartnerIds = new Set(
+    (launchPartners ?? []).map((p) => p.business_id as string).filter(Boolean),
+  );
   // Links with a branch_id belong to that branch; the rest to the business itself.
   const byBusiness = new Map<string, BusinessLink[]>();
   const byBranch = new Map<string, BusinessLink[]>();
@@ -152,6 +158,7 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
       byBusiness.get(row.id) ?? [],
       branchesByBusiness.get(row.id) ?? [],
     ),
+    isLaunchPartner: launchPartnerIds.has(row.id),
     entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
   }));
 }
@@ -168,16 +175,25 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
   const [
     { data: links, error: linksError },
     { data: branches, error: branchesError },
+    { data: launchPartner, error: launchPartnerError },
     catalog,
     packagesEnabled,
   ] = await Promise.all([
     client.from("business_links").select("*").eq("business_id", row.id),
     client.from("business_branches").select("*").eq("business_id", row.id).eq("published", true),
+    client
+      .from("success_partners")
+      .select("business_id")
+      .eq("kind", "business")
+      .eq("active", true)
+      .eq("business_id", row.id)
+      .maybeSingle(),
     readPlanCatalog(client),
     isPackagesEnabled(client),
   ]);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
+  if (launchPartnerError) throw new Error(launchPartnerError.message);
   const menu = packagesEnabled && !canUseMenu(row) ? [] : await fetchPublicMenu(client, row.id);
   const mappedLinks = (links ?? []).map(mapLink);
   const business = mapDbBusiness(
@@ -193,6 +209,7 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
   return {
     ...business,
     menu,
+    isLaunchPartner: !!launchPartner,
     entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
   };
 }

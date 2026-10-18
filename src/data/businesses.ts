@@ -157,6 +157,8 @@ export type Business = {
   dedicatedGf?: boolean;
   noLocation?: boolean;
   offersBooking?: boolean;
+  /** Admin-only mark (success_partners, kind='business', active=true). See isFeatured() in services.ts. */
+  isLaunchPartner?: boolean;
   discountCode?: string | null;
   createdAt?: string;
   links: BusinessLink[];
