@@ -380,288 +380,277 @@ function BusinessDetail() {
               />
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
-                {products && (
-                  <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
-                    <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <div className="flex flex-wrap gap-1.5">
-                      {products
-                        .split("-")
-                        .map((part) => part.trim())
-                        .filter(Boolean)
-                        .map((part, i) => (
-                          <span
-                            key={`${part}-${i}`}
-                            className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-foreground"
-                          >
-                            {part}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                )}
+            <div className="mt-8 space-y-6">
+              <PublicMenu
+                items={menuItems}
+                lang={lang}
+                establishmentLevel={establishmentMenuLevel(safetyLevel, !!b.sharedKitchen)}
+              />
 
-                {description && (
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {visibleDescription(b, description)}
+              {b.discountCode && (
+                <div className="rounded-2xl border border-primary/30 bg-primary-soft p-5">
+                  <p className="text-xs font-semibold text-primary">
+                    {t("business.discount_label")}
                   </p>
-                )}
-
-                <PublicMenu
-                  items={menuItems}
-                  lang={lang}
-                  establishmentLevel={establishmentMenuLevel(safetyLevel, !!b.sharedKitchen)}
-                />
-
-                {gallery.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {gallery.map((src) => (
-                      <div
-                        key={src}
-                        className="aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-muted"
-                      >
-                        <img
-                          src={src}
-                          alt={name}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {serviceTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {serviceTags.map((sv) => (
-                      <span
-                        key={sv.value}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary"
-                      >
-                        <sv.icon className="h-3.5 w-3.5" /> {sv[lang]}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {showLocation && address && (
-                  <InfoBlock icon={MapPin} title={t("business.address")}>
-                    <p className="text-sm text-foreground">{address}</p>
-                  </InfoBlock>
-                )}
-
-                {/* Online-only / home businesses have no storefront, so opening hours are hidden too. */}
-                {showLocation && (
-                  <InfoBlock icon={Clock} title={t("business.hours")}>
-                    <ul className="grid gap-1.5 text-sm sm:grid-cols-2">
-                      {days.map((d) => (
-                        <li
-                          key={d.key}
-                          className="flex justify-between gap-4 rounded-lg bg-secondary/40 px-3 py-1.5"
-                        >
-                          <span className="font-medium text-foreground">{d.label}</span>
-                          <span className="text-muted-foreground">{b.hours[d.key] || "—"}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </InfoBlock>
-                )}
-
-                {branches.length > 0 && (
-                  <InfoBlock
-                    icon={Building2}
-                    title={`${t("business.branches")} (${branches.length})`}
-                  >
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-card px-4 py-3">
+                    <code
+                      dir="ltr"
+                      className="truncate text-base font-bold tracking-wider text-foreground"
+                    >
+                      {b.discountCode}
+                    </code>
                     <button
                       type="button"
-                      onClick={() =>
-                        navigator.geolocation?.getCurrentPosition((pos) =>
-                          setMe({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                        )
-                      }
-                      className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
+                      onClick={copyDiscountCode}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                      aria-label={t("business.copy_discount")}
                     >
-                      <MapPin className="h-3.5 w-3.5" /> {t("business.find_nearest")}
+                      {copiedDiscount ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copiedDiscount ? t("business.discount_copied") : t("business.copy_discount")}
                     </button>
-                    <div className="space-y-3">
-                      {branches.map((br, brIndex) => {
-                        const brName = br.name_i18n?.[lang] ?? br.name;
-                        const brAddress = br.address_i18n?.[lang] ?? br.address;
-                        const brMaps =
-                          br.mapsUrl ||
-                          (br.lat && br.lng
-                            ? `https://www.google.com/maps/search/?api=1&query=${br.lat},${br.lng}`
-                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.name} ${brAddress || brName}`)}`);
-                        const brHours = days.filter((d) => br.hours[d.key]);
-                        return (
-                          <div
-                            key={br.id}
-                            className="rounded-2xl border border-border bg-secondary/30 p-4"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                                {brIndex + 1}
-                              </span>
-                              <h3 className="font-display text-sm font-semibold">{brName}</h3>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t("business.discount_note")}
+                  </p>
+                </div>
+              )}
 
-                              {me && br.lat && br.lng && (
-                                <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
-                                  {distanceKm(me, { lat: br.lat, lng: br.lng }).toFixed(1)}{" "}
-                                  {t("business.km_away")}
-                                </span>
-                              )}
-                              {br.permanentlyClosed && (
-                                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                                  {t("business.permanently_closed")}
-                                </span>
-                              )}
-                            </div>
-                            {brAddress && (
-                              <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted-foreground">
-                                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {brAddress}
-                              </p>
+              <ContactIconsRow
+                businessSlug={b.id}
+                mapsHref={showMultiBranchContact ? null : (singleBranch?.mapsUrl ?? mapsHref)}
+                website={websiteUrl}
+                instagram={instagramUrl}
+                tiktok={tiktokUrl}
+                email={email}
+                phone={showMultiBranchContact ? null : (singleBranch?.phone ?? b.phone ?? null)}
+                whatsappNumber={
+                  plan.showLinks && !showMultiBranchContact
+                    ? (singleBranch?.whatsapp ?? b.whatsapp ?? null)
+                    : null
+                }
+                hasWhatsappOrders={
+                  plan.showLinks && !showMultiBranchContact
+                    ? !!singleBranch?.whatsappOrdersEnabled
+                    : false
+                }
+              />
+              {!showMultiBranchContact && (
+                <OrderContactBox
+                  businessSlug={b.id}
+                  whatsappNumber={
+                    plan.showLinks ? (singleBranch?.whatsapp ?? b.whatsapp ?? null) : null
+                  }
+                  whatsappOrdersEnabled={!!singleBranch?.whatsappOrdersEnabled}
+                  deliveryUrl={singleBranch?.deliveryUrl ?? null}
+                  pickupEnabled={!!singleBranch?.pickupEnabled || hasCategory(b, "svc_pickup")}
+                  deliveryEnabled={
+                    !!singleBranch?.deliveryEnabled || hasCategory(b, "svc_delivery")
+                  }
+                  menuItems={menuItems}
+                  lang={lang}
+                />
+              )}
+
+              {products && (
+                <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
+                  <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div className="flex flex-wrap gap-1.5">
+                    {products
+                      .split("-")
+                      .map((part) => part.trim())
+                      .filter(Boolean)
+                      .map((part, i) => (
+                        <span
+                          key={`${part}-${i}`}
+                          className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-foreground"
+                        >
+                          {part}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {description && (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {visibleDescription(b, description)}
+                </p>
+              )}
+
+              {gallery.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {gallery.map((src) => (
+                    <div
+                      key={src}
+                      className="aspect-[4/3] overflow-hidden rounded-2xl border border-border bg-muted"
+                    >
+                      <img
+                        src={src}
+                        alt={name}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {serviceTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {serviceTags.map((sv) => (
+                    <span
+                      key={sv.value}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary"
+                    >
+                      <sv.icon className="h-3.5 w-3.5" /> {sv[lang]}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {showLocation && address && (
+                <InfoBlock icon={MapPin} title={t("business.address")}>
+                  <p className="text-sm text-foreground">{address}</p>
+                </InfoBlock>
+              )}
+
+              {/* Online-only / home businesses have no storefront, so opening hours are hidden too. */}
+              {showLocation && (
+                <InfoBlock icon={Clock} title={t("business.hours")}>
+                  <ul className="grid gap-1.5 text-sm sm:grid-cols-2">
+                    {days.map((d) => (
+                      <li
+                        key={d.key}
+                        className="flex justify-between gap-4 rounded-lg bg-secondary/40 px-3 py-1.5"
+                      >
+                        <span className="font-medium text-foreground">{d.label}</span>
+                        <span className="text-muted-foreground">{b.hours[d.key] || "—"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </InfoBlock>
+              )}
+
+              {branches.length > 0 && (
+                <InfoBlock
+                  icon={Building2}
+                  title={`${t("business.branches")} (${branches.length})`}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigator.geolocation?.getCurrentPosition((pos) =>
+                        setMe({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                      )
+                    }
+                    className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
+                  >
+                    <MapPin className="h-3.5 w-3.5" /> {t("business.find_nearest")}
+                  </button>
+                  <div className="space-y-3">
+                    {branches.map((br, brIndex) => {
+                      const brName = br.name_i18n?.[lang] ?? br.name;
+                      const brAddress = br.address_i18n?.[lang] ?? br.address;
+                      const brMaps =
+                        br.mapsUrl ||
+                        (br.lat && br.lng
+                          ? `https://www.google.com/maps/search/?api=1&query=${br.lat},${br.lng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.name} ${brAddress || brName}`)}`);
+                      const brHours = days.filter((d) => br.hours[d.key]);
+                      return (
+                        <div
+                          key={br.id}
+                          className="rounded-2xl border border-border bg-secondary/30 p-4"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                              {brIndex + 1}
+                            </span>
+                            <h3 className="font-display text-sm font-semibold">{brName}</h3>
+
+                            {me && br.lat && br.lng && (
+                              <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
+                                {distanceKm(me, { lat: br.lat, lng: br.lng }).toFixed(1)}{" "}
+                                {t("business.km_away")}
+                              </span>
                             )}
-                            {brHours.length > 0 && (
-                              <ul className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
-                                {brHours.map((d) => (
-                                  <li
-                                    key={d.key}
-                                    className="flex justify-between gap-3 text-muted-foreground"
-                                  >
-                                    <span className="font-medium text-foreground">{d.label}</span>
-                                    <span>{br.hours[d.key]}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                            {showMultiBranchContact && (
-                              <div className="mt-3 space-y-3">
-                                <ContactIconsRow
-                                  businessSlug={b.id}
-                                  mapsHref={goHref({
-                                    to: brMaps,
-                                    type: "click_maps",
-                                    business: b.id,
-                                    platform: "maps",
-                                  })}
-                                  phone={br.phone ?? null}
-                                  whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
-                                  hasWhatsappOrders={!!br.whatsappOrdersEnabled}
-                                />
-                                <OrderContactBox
-                                  businessSlug={b.id}
-                                  whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
-                                  whatsappOrdersEnabled={!!br.whatsappOrdersEnabled}
-                                  deliveryUrl={br.deliveryUrl ?? null}
-                                  pickupEnabled={!!br.pickupEnabled}
-                                  deliveryEnabled={!!br.deliveryEnabled}
-                                  menuItems={menuItems}
-                                  lang={lang}
-                                />
-                                {/* Legacy per-branch links saved under other platforms (x, facebook, booking apps…),
-                                    kept visible exactly as before; third-party delivery stays hidden. */}
-                                {(plan.showLinks ? (br.links ?? []) : [])
-                                  .filter(
-                                    (l) => !THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform),
-                                  )
-                                  .map((l) => (
-                                    <a
-                                      key={l.id}
-                                      href={trackedHref(l)}
-                                      target={l.platform === "phone" ? undefined : "_blank"}
-                                      rel="noreferrer noopener"
-                                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
-                                    >
-                                      {l.label || platformLabel(l.platform, t)}
-                                      <ExternalLink className="h-3 w-3 rtl:rotate-180" />
-                                    </a>
-                                  ))}
-                              </div>
+                            {br.permanentlyClosed && (
+                              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                                {t("business.permanently_closed")}
+                              </span>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                    {/* One shared map lives in the Location section below. */}
-                  </InfoBlock>
-                )}
-              </div>
-
-              {/* On mobile this jumps above the (long) main column so the WhatsApp/call button —
-                  and the single disclaimer right above this grid — stay close together; the
-                  side-by-side desktop layout is unaffected. */}
-              <aside className="order-first space-y-4 lg:order-none">
-                {b.discountCode && (
-                  <div className="rounded-2xl border border-primary/30 bg-primary-soft p-5">
-                    <p className="text-xs font-semibold text-primary">
-                      {t("business.discount_label")}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-card px-4 py-3">
-                      <code
-                        dir="ltr"
-                        className="truncate text-base font-bold tracking-wider text-foreground"
-                      >
-                        {b.discountCode}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={copyDiscountCode}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-                        aria-label={t("business.copy_discount")}
-                      >
-                        {copiedDiscount ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        {copiedDiscount
-                          ? t("business.discount_copied")
-                          : t("business.copy_discount")}
-                      </button>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {t("business.discount_note")}
-                    </p>
+                          {brAddress && (
+                            <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted-foreground">
+                              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {brAddress}
+                            </p>
+                          )}
+                          {brHours.length > 0 && (
+                            <ul className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+                              {brHours.map((d) => (
+                                <li
+                                  key={d.key}
+                                  className="flex justify-between gap-3 text-muted-foreground"
+                                >
+                                  <span className="font-medium text-foreground">{d.label}</span>
+                                  <span>{br.hours[d.key]}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {showMultiBranchContact && (
+                            <div className="mt-3 space-y-3">
+                              <ContactIconsRow
+                                businessSlug={b.id}
+                                mapsHref={goHref({
+                                  to: brMaps,
+                                  type: "click_maps",
+                                  business: b.id,
+                                  platform: "maps",
+                                })}
+                                phone={br.phone ?? null}
+                                whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
+                                hasWhatsappOrders={!!br.whatsappOrdersEnabled}
+                              />
+                              <OrderContactBox
+                                businessSlug={b.id}
+                                whatsappNumber={plan.showLinks ? (br.whatsapp ?? null) : null}
+                                whatsappOrdersEnabled={!!br.whatsappOrdersEnabled}
+                                deliveryUrl={br.deliveryUrl ?? null}
+                                pickupEnabled={!!br.pickupEnabled}
+                                deliveryEnabled={!!br.deliveryEnabled}
+                                menuItems={menuItems}
+                                lang={lang}
+                              />
+                              {/* Legacy per-branch links saved under other platforms (x, facebook, booking apps…),
+                                    kept visible exactly as before; third-party delivery stays hidden. */}
+                              {(plan.showLinks ? (br.links ?? []) : [])
+                                .filter((l) => !THIRD_PARTY_DELIVERY_PLATFORMS.includes(l.platform))
+                                .map((l) => (
+                                  <a
+                                    key={l.id}
+                                    href={trackedHref(l)}
+                                    target={l.platform === "phone" ? undefined : "_blank"}
+                                    rel="noreferrer noopener"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground"
+                                  >
+                                    {l.label || platformLabel(l.platform, t)}
+                                    <ExternalLink className="h-3 w-3 rtl:rotate-180" />
+                                  </a>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-
-                <ContactIconsRow
-                  businessSlug={b.id}
-                  mapsHref={showMultiBranchContact ? null : (singleBranch?.mapsUrl ?? mapsHref)}
-                  website={websiteUrl}
-                  instagram={instagramUrl}
-                  tiktok={tiktokUrl}
-                  email={email}
-                  phone={showMultiBranchContact ? null : (singleBranch?.phone ?? b.phone ?? null)}
-                  whatsappNumber={
-                    plan.showLinks && !showMultiBranchContact
-                      ? (singleBranch?.whatsapp ?? b.whatsapp ?? null)
-                      : null
-                  }
-                  hasWhatsappOrders={
-                    plan.showLinks && !showMultiBranchContact
-                      ? !!singleBranch?.whatsappOrdersEnabled
-                      : false
-                  }
-                />
-                {!showMultiBranchContact && (
-                  <OrderContactBox
-                    businessSlug={b.id}
-                    whatsappNumber={
-                      plan.showLinks ? (singleBranch?.whatsapp ?? b.whatsapp ?? null) : null
-                    }
-                    whatsappOrdersEnabled={!!singleBranch?.whatsappOrdersEnabled}
-                    deliveryUrl={singleBranch?.deliveryUrl ?? null}
-                    pickupEnabled={!!singleBranch?.pickupEnabled || hasCategory(b, "svc_pickup")}
-                    deliveryEnabled={
-                      !!singleBranch?.deliveryEnabled || hasCategory(b, "svc_delivery")
-                    }
-                    menuItems={menuItems}
-                    lang={lang}
-                  />
-                )}
-              </aside>
+                  {/* One shared map lives in the Location section below. */}
+                </InfoBlock>
+              )}
             </div>
           </div>
         </div>
