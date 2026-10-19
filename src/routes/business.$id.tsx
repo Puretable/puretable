@@ -472,45 +472,6 @@ function BusinessDetail() {
                 />
               )}
 
-              {showLocation && mapPoints.length > 0 && (
-                <div>
-                  <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t("business.location")}
-                    {mapPoints.length > 1 ? ` (${mapPoints.length})` : ""}
-                  </h2>
-                  <div className="mt-3">
-                    {mapPoints.length > 1 && (
-                      <div
-                        className="mb-3 flex gap-2 overflow-x-auto pb-1"
-                        aria-label={t("business.map_locations")}
-                      >
-                        {mapPoints.map((point) => (
-                          <button
-                            key={point.id}
-                            type="button"
-                            onClick={() => setSelectedMapPoint(point.id)}
-                            aria-pressed={selectedMapPoint === point.id}
-                            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                              selectedMapPoint === point.id
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-card hover:border-primary/40 hover:text-primary"
-                            }`}
-                          >
-                            {point.title}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <BranchesLeafletMap
-                      points={mapPoints}
-                      height={360}
-                      activePointId={selectedMapPoint}
-                      onPointSelect={setSelectedMapPoint}
-                    />
-                  </div>
-                </div>
-              )}
-
               {products && (
                 <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
                   <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -714,7 +675,44 @@ function BusinessDetail() {
         </div>
       </section>
 
-      {!showLocation && b.noLocation && (
+      {showLocation && mapPoints.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <h2 className="font-display text-xl font-semibold">
+            {t("business.location")}
+            {mapPoints.length > 1 ? ` (${mapPoints.length})` : ""}
+          </h2>
+          <div className="mt-4">
+            {mapPoints.length > 1 && (
+              <div
+                className="mb-3 flex gap-2 overflow-x-auto pb-1"
+                aria-label={t("business.map_locations")}
+              >
+                {mapPoints.map((point) => (
+                  <button
+                    key={point.id}
+                    type="button"
+                    onClick={() => setSelectedMapPoint(point.id)}
+                    aria-pressed={selectedMapPoint === point.id}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                      selectedMapPoint === point.id
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:border-primary/40 hover:text-primary"
+                    }`}
+                  >
+                    {point.title}
+                  </button>
+                ))}
+              </div>
+            )}
+            <BranchesLeafletMap
+              points={mapPoints}
+              height={400}
+              activePointId={selectedMapPoint}
+              onPointSelect={setSelectedMapPoint}
+            />
+          </div>
+        </section>
+      ) : b.noLocation ? (
         <section className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
           <div className="flex gap-3 rounded-2xl border border-border bg-secondary/50 p-5">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -723,7 +721,7 @@ function BusinessDetail() {
             </p>
           </div>
         </section>
-      )}
+      ) : null}
 
       <section
         id="disclaimer"
