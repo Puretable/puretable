@@ -394,3 +394,81 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
     </section>
   );
 }
+
+/**
+ * The single discount code — moved out of "بيانات العمل" (see BusinessInfoForm.tsx). Rendered on
+ * the menu tab, below the menu items, regardless of whether the items themselves are shown (the
+ * discount code is never plan-gated, unlike the menu).
+ */
+export function DiscountCodeEditor({
+  discountCode,
+  save,
+  disabled,
+}: {
+  discountCode: string | null;
+  save: (code: string | null) => Promise<unknown>;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(discountCode ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy || disabled) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await save(draft.trim() || null);
+      setMessage("تم حفظ كود الخصم.");
+    } catch (e) {
+      setError(friendlyPortalError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-2xl border border-border p-4 sm:p-5">
+      <h3 className="text-sm font-semibold">أكواد الخصم</h3>
+      <label className="block text-sm">
+        كود الخصم النشط (اختياري)
+        <input
+          maxLength={80}
+          disabled={busy || disabled}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setMessage("");
+          }}
+          className="mt-2 w-full rounded-xl border bg-background p-3"
+        />
+        <span className="mt-1 block text-xs text-muted-foreground">
+          كود واحد فقط. اتركه فارغاً لإيقافه.
+        </span>
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p role="status" className="text-sm text-primary">
+          {message}
+        </p>
+      )}
+      {!disabled && (
+        <button
+          type="submit"
+          disabled={busy}
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          حفظ كود الخصم
+        </button>
+      )}
+    </form>
+  );
+}

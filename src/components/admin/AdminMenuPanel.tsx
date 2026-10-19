@@ -1,19 +1,33 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { MenuManager } from "@/components/portal/MenuManager";
+import { DiscountCodeEditor, MenuManager } from "@/components/portal/MenuManager";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteMenuItemFn, saveMenuItemFn, signBusinessUpload } from "@/lib/owner-manage.functions";
+import {
+  deleteMenuItemFn,
+  saveDiscountCodeFn,
+  saveMenuItemFn,
+  signBusinessUpload,
+} from "@/lib/owner-manage.functions";
 import type { MenuItem, MenuItemInput } from "@/lib/owner-manage.schemas";
 
 /**
  * Admin view of a business's gluten-free menu. It is the same editor owners use; admins may always
  * edit (even while an owner's access is suspended), and the server still authorises every call.
+ * The discount code (moved out of the main business form) is shown below it, same as the owner
+ * portal's menu tab.
  */
-export function AdminMenuPanel({ businessId }: { businessId: string }) {
+export function AdminMenuPanel({
+  businessId,
+  discountCode,
+}: {
+  businessId: string;
+  discountCode: string | null;
+}) {
   const qc = useQueryClient();
   const saveItem = useServerFn(saveMenuItemFn);
   const removeItem = useServerFn(deleteMenuItemFn);
   const sign = useServerFn(signBusinessUpload);
+  const saveDiscount = useServerFn(saveDiscountCodeFn);
   const items = useQuery({
     queryKey: ["admin-menu-items", businessId],
     queryFn: async () => {
@@ -62,6 +76,15 @@ export function AdminMenuPanel({ businessId }: { businessId: string }) {
           sign={(filename) => sign({ data: { businessId, filename } })}
         />
       )}
+      <div className="mt-4">
+        <DiscountCodeEditor
+          discountCode={discountCode}
+          save={async (code) => {
+            await saveDiscount({ data: { business_id: businessId, discount_code: code } });
+            await refresh();
+          }}
+        />
+      </div>
     </section>
   );
 }

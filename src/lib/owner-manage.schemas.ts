@@ -178,6 +178,13 @@ export const AcceptAgreementInput = z.object({
 });
 export type AcceptAgreementInput = z.infer<typeof AcceptAgreementInput>;
 
+/** Lives in the menu tab now (see MenuManager.tsx) — shared by the owner portal and admin page. */
+export const DiscountCodeInput = z.object({
+  business_id: z.string().uuid(),
+  discount_code: opt(80),
+});
+export type DiscountCodeInput = z.infer<typeof DiscountCodeInput>;
+
 export const MenuItemInput = z.object({
   id: z.string().uuid().optional(),
   business_id: z.string().uuid(),

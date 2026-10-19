@@ -20,7 +20,7 @@ import {
 import { Page } from "@/components/site/Layout";
 import { usePageView } from "@/hooks/use-page-view";
 import { useMemo, useState } from "react";
-import { BranchesMap } from "@/components/site/BranchesMap";
+import { BranchesLeafletMap } from "@/components/site/BranchesLeafletMap";
 import { distanceKm, hasCategory, THIRD_PARTY_DELIVERY_PLATFORMS } from "@/data/businesses";
 import { SERVICE_DEFS } from "@/lib/services";
 import { useFilters } from "@/lib/filters";
@@ -195,11 +195,13 @@ function BusinessDetail() {
   const whatsappMessage = pureTableWhatsAppMessage();
   const discountCode = b.discountCode;
 
-  // Home businesses ("أسر منتجة") are shown without any Google Maps location —
-  // only delivery links, social accounts and phone.
-  // Home businesses ("أسر منتجة") are shown without any Google Maps location —
-  // unless real branches were saved, the map always wins over the flag.
-  const showLocation = branchList.length > 0 || (!b.noLocation && !hasCategory(b, "home"));
+  // Home businesses ("أسر منتجة") never show an address block, opening hours or a map, regardless
+  // of saved branches — their exact location is private by design. The coordinate redaction in
+  // businesses.server.ts (public_business_coordinates()/public_branch_coordinates()) already never
+  // sends real lat/lng for these businesses anyway; this keeps the UI consistent with that instead
+  // of showing an empty/broken map section.
+  const isHomeBusiness = hasCategory(b, "home");
+  const showLocation = !isHomeBusiness && (branchList.length > 0 || !b.noLocation);
 
   const hasCoords = showLocation && !!(b.lat && b.lng);
   const safetyLevel = b.safety ?? (b.dedicatedGf ? "green" : "red");
@@ -213,9 +215,16 @@ function BusinessDetail() {
           ? `https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lng}`
           : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.name} ${b.address || b.city}`)}`);
 
-  // All map pins for this business: the main location plus every published branch.
-  // Keep missing coordinates explicit; the map shows a notice instead of
-  // guessing a location or contacting an external geocoding service.
+  // All map pins for this business: the main location plus every published branch. Keep missing
+  // coordinates explicit; the map shows a notice instead of guessing a location or contacting an
+  // external geocoding service. Each point also gets a direct Google Maps "Directions" URL — its
+  // own saved link, falling back to a lat/lng search, falling back to a text search — same fallback
+  // chain already used for the per-branch list further down this page.
+  const directionsFor = (mapsUrl: string | null, lat: number | null, lng: number | null, q: string) =>
+    mapsUrl ||
+    (lat && lng
+      ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`);
   const mapPoints = showLocation
     ? [
         ...(branches.length === 0 || hasCoords
@@ -226,22 +235,29 @@ function BusinessDetail() {
                 lat: b.lat ?? null,
                 lng: b.lng ?? null,
                 address,
-                mapsUrl: b.mapsUrl ?? null,
-                query: `${b.name} ${b.address || b.city}`,
+                directionsUrl: directionsFor(b.mapsUrl ?? null, b.lat ?? null, b.lng ?? null, `${b.name} ${b.address || b.city}`),
               },
             ]
           : []),
         ...branches
           .filter((br) => !br.permanentlyClosed)
-          .map((br) => ({
-            id: br.id,
-            title: br.name_i18n?.[lang] ?? br.name,
-            lat: br.lat ?? null,
-            lng: br.lng ?? null,
-            address: br.address_i18n?.[lang] ?? br.address,
-            mapsUrl: br.mapsUrl ?? null,
-            query: `${b.name} ${br.address || br.name}`,
-          })),
+          .map((br) => {
+            const brAddr = br.address_i18n?.[lang] ?? br.address;
+            const brTitle = br.name_i18n?.[lang] ?? br.name;
+            return {
+              id: br.id,
+              title: brTitle,
+              lat: br.lat ?? null,
+              lng: br.lng ?? null,
+              address: brAddr,
+              directionsUrl: directionsFor(
+                br.mapsUrl ?? null,
+                br.lat ?? null,
+                br.lng ?? null,
+                `${b.name} ${brAddr || brTitle}`,
+              ),
+            };
+          }),
       ]
     : [];
 
@@ -456,6 +472,45 @@ function BusinessDetail() {
                 />
               )}
 
+              {showLocation && mapPoints.length > 0 && (
+                <div>
+                  <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("business.location")}
+                    {mapPoints.length > 1 ? ` (${mapPoints.length})` : ""}
+                  </h2>
+                  <div className="mt-3">
+                    {mapPoints.length > 1 && (
+                      <div
+                        className="mb-3 flex gap-2 overflow-x-auto pb-1"
+                        aria-label={t("business.map_locations")}
+                      >
+                        {mapPoints.map((point) => (
+                          <button
+                            key={point.id}
+                            type="button"
+                            onClick={() => setSelectedMapPoint(point.id)}
+                            aria-pressed={selectedMapPoint === point.id}
+                            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                              selectedMapPoint === point.id
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card hover:border-primary/40 hover:text-primary"
+                            }`}
+                          >
+                            {point.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <BranchesLeafletMap
+                      points={mapPoints}
+                      height={360}
+                      activePointId={selectedMapPoint}
+                      onPointSelect={setSelectedMapPoint}
+                    />
+                  </div>
+                </div>
+              )}
+
               {products && (
                 <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
                   <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -659,46 +714,7 @@ function BusinessDetail() {
         </div>
       </section>
 
-      {showLocation ? (
-        <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <h2 className="font-display text-xl font-semibold">
-            {t("business.location")}
-            {mapPoints.length > 1 ? ` (${mapPoints.length})` : ""}
-          </h2>
-          {mapPoints.length > 0 ? (
-            <div className="mt-4">
-              {mapPoints.length > 1 && (
-                <div
-                  className="mb-3 flex gap-2 overflow-x-auto pb-1"
-                  aria-label={t("business.map_locations")}
-                >
-                  {mapPoints.map((point) => (
-                    <button
-                      key={point.id}
-                      type="button"
-                      onClick={() => setSelectedMapPoint(point.id)}
-                      aria-pressed={selectedMapPoint === point.id}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                        selectedMapPoint === point.id
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-card hover:border-primary/40 hover:text-primary"
-                      }`}
-                    >
-                      {point.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <BranchesMap
-                points={mapPoints}
-                height={400}
-                activePointId={selectedMapPoint}
-                onPointSelect={setSelectedMapPoint}
-              />
-            </div>
-          ) : null}
-        </section>
-      ) : b.noLocation ? (
+      {!showLocation && b.noLocation && (
         <section className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
           <div className="flex gap-3 rounded-2xl border border-border bg-secondary/50 p-5">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -707,7 +723,7 @@ function BusinessDetail() {
             </p>
           </div>
         </section>
-      ) : null}
+      )}
 
       <section
         id="disclaimer"

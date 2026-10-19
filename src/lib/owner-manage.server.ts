@@ -7,6 +7,7 @@ import {
   AGREEMENT_TERMS_VERSION,
   type AcceptAgreementInput,
   type BillingFieldsInput,
+  type DiscountCodeInput,
   type MenuItemInput,
   type OwnerBranchInput,
   type OwnerBusinessInput,
@@ -402,6 +403,19 @@ async function assertMenuAllowed(actor: Actor, businessId: string, access: Acces
     .eq("id", businessId)
     .single();
   if (error || !data) throw new Error("Forbidden");
+}
+
+/** The single discount code, now edited from the menu tab (shared by owner portal and admin). */
+export async function saveDiscountCode(actor: Actor, input: DiscountCodeInput) {
+  await requireOwnerOrAdmin(actor, input.business_id);
+  const { data, error } = await actor.adminClient
+    .from("businesses")
+    .update({ discount_code: input.discount_code?.trim() || null })
+    .eq("id", input.business_id)
+    .select("discount_code")
+    .single();
+  if (error) throw new Error(friendlyDbError(error.message));
+  return data;
 }
 
 export async function saveMenuItem(actor: Actor, input: MenuItemInput) {

@@ -6,6 +6,7 @@ import { BranchInput } from "@/lib/businesses.schemas";
 import { branchLimitLabel, remainingBranchSlots, type PlanTier } from "@/lib/plans";
 import { LocationPicker } from "./LocationPicker";
 import { pickBilingual } from "@/lib/bilingual";
+import { extractLatLngFromGoogleMapsUrl } from "@/lib/coordinates";
 
 // maps_url/phone/whatsapp/delivery_url use a normalizing validator (z.preprocess), so their z.input
 // type is "unknown" — fine for parsing, not for a plain text input's value. Overridden here to the
@@ -61,6 +62,10 @@ export function BranchEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [mapsLink, setMapsLink] = useState("");
+  const [mapsLinkError, setMapsLinkError] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState("");
   const slots = remainingBranchSlots(
     plan,
     existing.filter((b) => b.published && !b.permanently_closed).length,
@@ -115,6 +120,44 @@ export function BranchEditor({
       setBusy(false);
     }
   }
+
+  function applyMapsLink() {
+    setMapsLinkError("");
+    const found = extractLatLngFromGoogleMapsUrl(mapsLink);
+    if (!found) {
+      setMapsLinkError(
+        "لم يتم العثور على إحداثيات في هذا الرابط. جرّب رابطاً من شريط العنوان يحتوي على @ متبوعاً بأرقام.",
+      );
+      return;
+    }
+    setDraft((current) => (current ? { ...current, lat: found.lat, lng: found.lng } : current));
+    setMapsLink("");
+  }
+
+  function useCurrentLocation() {
+    setLocateError("");
+    if (!navigator.geolocation) {
+      setLocateError("المتصفح لا يدعم تحديد الموقع.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDraft((current) =>
+          current
+            ? { ...current, lat: pos.coords.latitude, lng: pos.coords.longitude }
+            : current,
+        );
+        setLocating(false);
+      },
+      () => {
+        setLocateError("تعذر الحصول على موقعك الحالي. تأكد من السماح بالوصول للموقع.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
   return (
     <div className="space-y-4" dir="rtl">
       <p className="text-sm text-muted-foreground">
@@ -226,6 +269,41 @@ export function BranchEditor({
                 />
               </label>
             ))}
+            <div className="col-span-full flex flex-wrap items-end gap-2">
+              <label className="grid min-w-[14rem] flex-1 gap-1 text-sm">
+                الصق رابط خرائط جوجل (اختياري) لتعبئة الإحداثيات
+                <input
+                  dir="ltr"
+                  placeholder="https://www.google.com/maps/@24.71,46.67,15z"
+                  className="rounded-lg border bg-background p-2"
+                  value={mapsLink}
+                  onChange={(e) => {
+                    setMapsLink(e.target.value);
+                    setMapsLinkError("");
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={applyMapsLink}
+                disabled={!mapsLink.trim()}
+                className="h-fit rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+              >
+                استخرج الإحداثيات
+              </button>
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                disabled={locating}
+                className="h-fit rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {locating ? "جارٍ التحديد…" : "استخدم موقعي الحالي"}
+              </button>
+            </div>
+            {mapsLinkError && (
+              <p className="col-span-full text-xs text-destructive">{mapsLinkError}</p>
+            )}
+            {locateError && <p className="col-span-full text-xs text-destructive">{locateError}</p>}
             <LocationPicker
               lat={draft.lat ?? null}
               lng={draft.lng ?? null}

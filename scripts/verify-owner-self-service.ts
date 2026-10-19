@@ -14,6 +14,7 @@ import {
   deleteOwnerLink,
   getFirstLoginAgreement,
   saveBusinessBillingFields,
+  saveDiscountCode,
   saveMenuItem,
   saveOwnerBranch,
   saveOwnerBusinessContact,
@@ -1866,6 +1867,174 @@ try {
   step("owner cannot change featured status in either direction (RLS denies delete/update)");
 
   ok(await service.from("success_partners").delete().eq("id", partnerRow.id));
+
+  console.log("Branch coordinates: home-business privacy, auto-sync, discount code relocation");
+  const homeBiz = ok(
+    await service
+      .from("businesses")
+      .insert({
+        slug: `qa-self-home-${tag}`,
+        name: `QA Home ${tag}`,
+        category: "home",
+        city: "Riyadh",
+        plan: "free",
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  created.businesses.push(homeBiz.id);
+  const regularBiz = ok(
+    await service
+      .from("businesses")
+      .insert({
+        slug: `qa-self-geo-${tag}`,
+        name: `QA Geo ${tag}`,
+        category: "cafe",
+        city: "Riyadh",
+        plan: "free",
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  created.businesses.push(regularBiz.id);
+  const homeBranch = ok(
+    await service
+      .from("business_branches")
+      .insert({
+        business_id: homeBiz.id,
+        name: "Home branch",
+        city: "Riyadh",
+        lat: 24.7136,
+        lng: 46.6753,
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  const regularBranch = ok(
+    await service
+      .from("business_branches")
+      .insert({
+        business_id: regularBiz.id,
+        name: "Jeddah branch",
+        city: "Jeddah",
+        city_ar: "جدة",
+        lat: 21.4858,
+        lng: 39.1925,
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  step("setup: one home-category business and one regular business, each with a located branch");
+
+  // City/district auto-sync from the branch (removes the need for a business-level location box).
+  assert.equal(
+    ok(await service.from("businesses").select("city,city_ar").eq("id", regularBiz.id).single())
+      .city,
+    "Jeddah",
+    "businesses.city followed the branch's city automatically",
+  );
+  step("businesses.city/city_ar auto-sync from the primary branch (no manual entry needed)");
+
+  // Direct anon reads of lat/lng are refused at the column-grant level — not just hidden in the UI.
+  const publicAnon = anonClient();
+  const anonBusinessCoords = await publicAnon
+    .from("businesses")
+    .select("lat,lng")
+    .eq("id", regularBiz.id);
+  assert.ok(anonBusinessCoords.error, "anon cannot select businesses.lat/lng directly");
+  const anonBranchCoords = await publicAnon
+    .from("business_branches")
+    .select("lat,lng")
+    .eq("id", regularBranch.id);
+  assert.ok(anonBranchCoords.error, "anon cannot select business_branches.lat/lng directly");
+  step("anon has no column grant for lat/lng on businesses or business_branches (not just UI-hidden)");
+
+  // The redacted RPCs: real coordinates for a regular business, null for a home business.
+  const bizCoords = ok(
+    await publicAnon
+      .rpc("public_business_coordinates")
+      .in("business_id", [homeBiz.id, regularBiz.id]),
+  ) as { business_id: string; lat: number | null; lng: number | null }[];
+  const homeBizCoord = bizCoords.find((c) => c.business_id === homeBiz.id);
+  const regularBizCoord = bizCoords.find((c) => c.business_id === regularBiz.id);
+  assert.equal(homeBizCoord?.lat, null, "home business: public_business_coordinates returns null lat");
+  assert.equal(homeBizCoord?.lng, null, "home business: public_business_coordinates returns null lng");
+  assert.equal(regularBizCoord?.lat, null, "a business with no business-level lat/lng stays null");
+
+  const branchCoords = ok(
+    await publicAnon
+      .rpc("public_branch_coordinates")
+      .in("branch_id", [homeBranch.id, regularBranch.id]),
+  ) as { branch_id: string; lat: number | null; lng: number | null }[];
+  const homeBranchCoord = branchCoords.find((c) => c.branch_id === homeBranch.id);
+  const regularBranchCoord = branchCoords.find((c) => c.branch_id === regularBranch.id);
+  assert.equal(homeBranchCoord?.lat, null, "home business's branch: coordinates redacted to null");
+  assert.equal(homeBranchCoord?.lng, null, "home business's branch: coordinates redacted to null");
+  assert.equal(regularBranchCoord?.lat, 21.4858, "a regular business's branch keeps its real lat");
+  assert.equal(regularBranchCoord?.lng, 39.1925, "a regular business's branch keeps its real lng");
+  step(
+    "public_business_coordinates()/public_branch_coordinates(): null for home businesses, real values otherwise",
+  );
+
+  // Owners can only ever touch their own branch's coordinates (existing branch-ownership
+  // enforcement — ties specifically to the new coordinate fields here).
+  const geoOwner = await makeUser("geo-owner");
+  ok(await service.from("business_owners").insert({ business_id: regularBiz.id, email: geoOwner.email }));
+  const strangerGeoAttempt = await saveOwnerBranch(
+    actorFor(geoOwner),
+    OwnerBranchInput.parse({
+      business_id: homeBiz.id,
+      id: homeBranch.id,
+      name: "hijacked",
+      lat: 1,
+      lng: 1,
+    }),
+  ).catch((e: unknown) => e);
+  assert.ok(
+    strangerGeoAttempt instanceof Error,
+    "an owner of a different business cannot edit another business's branch coordinates",
+  );
+  assert.equal(
+    ok(await service.from("business_branches").select("lat").eq("id", homeBranch.id).single()).lat,
+    24.7136,
+    "the home branch's coordinates are untouched",
+  );
+  step("owners can only edit their own branches' coordinates, never another business's");
+
+  // Discount code now saves from its new home (menu tab), shared by owner and admin.
+  await saveDiscountCode(staffActor, { business_id: regularBiz.id, discount_code: "QA10" });
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA10",
+    "admin saves the discount code from its new location",
+  );
+  await saveDiscountCode(actorFor(geoOwner), { business_id: regularBiz.id, discount_code: "QA20" });
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA20",
+    "the business's own owner saves it too",
+  );
+  const foreignDiscountAttempt = await saveDiscountCode(ownerActor, {
+    business_id: regularBiz.id,
+    discount_code: "STOLEN",
+  }).catch((e: unknown) => e);
+  assert.ok(
+    foreignDiscountAttempt instanceof Error,
+    "a different business's owner cannot set this business's discount code",
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA20",
+    "unchanged after the rejected attempt",
+  );
+  step("discount code: owner and admin can both save it from the menu tab; another owner cannot");
 
   console.log(`\nAll ${checks} checks passed.`);
 } finally {

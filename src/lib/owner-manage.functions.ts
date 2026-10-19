@@ -12,6 +12,7 @@ import {
   deleteOwnerLink,
   getFirstLoginAgreement,
   saveBusinessBillingFields,
+  saveDiscountCode,
   saveMenuItem,
   saveOwnerBranch,
   saveOwnerBusinessContact,
@@ -24,6 +25,7 @@ import {
 import {
   AcceptAgreementInput,
   BillingFieldsInput,
+  DiscountCodeInput,
   MenuItemInput,
   OwnerBranchInput,
   OwnerBusinessInput,
@@ -149,6 +151,12 @@ export const deleteOwnerLinkFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     deleteOwnerLink(await actorFor(context), data.businessId, data.id),
   );
+
+/** Shared by the owner portal and the admin business page (admins are always allowed). */
+export const saveDiscountCodeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => DiscountCodeInput.parse(input))
+  .handler(async ({ data, context }) => saveDiscountCode(await actorFor(context), data));
 
 /** Shared by the owner portal and the admin business page (admins are always allowed). */
 export const saveMenuItemFn = createServerFn({ method: "POST" })

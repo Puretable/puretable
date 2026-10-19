@@ -1,6 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { LocationPicker } from "@/components/admin/LocationPicker";
 import { useSiteText } from "@/hooks/use-site-settings";
 import {
   DAY_KEYS,
@@ -68,7 +67,6 @@ export function BusinessInfoForm({
   disabled?: boolean;
 }) {
   const { text } = useSiteText();
-  const s = (v: string | null | undefined) => v ?? "";
   // One box per field: Arabic and English used to be separate inputs writing to separate columns.
   // Now there is a single box per field, prefilled from whichever language already has text
   // (Arabic first), and on save the same text is written to both columns — see submit() below.
@@ -76,12 +74,6 @@ export function BusinessInfoForm({
     name: pickBilingual(business.name_ar, business.name),
     description: pickBilingual(business.description_ar, business.description),
     products: pickBilingual(business.products_ar, business.products),
-    city: pickBilingual(business.city_ar, business.city),
-    district: pickBilingual(business.district_ar, business.district),
-    address: pickBilingual(business.address_ar, business.address),
-    discount_code: s(business.discount_code),
-    lat: business.lat,
-    lng: business.lng,
     no_location: business.no_location,
     safety: business.safety as SafetyLevel,
     shared_kitchen: business.shared_kitchen,
@@ -106,17 +98,23 @@ export function BusinessInfoForm({
       description_ar: f.description,
       products: f.products,
       products_ar: f.products,
+      // City/district are no longer typed here — every branch already has its own location, and
+      // businesses.city/city_ar/district/district_ar now follow the primary branch automatically
+      // (see the sync_business_location_from_branches trigger). Address/lat/lng/discount_code are
+      // likewise passed through unchanged: address has no owner-facing box left (location lives per
+      // branch), lat/lng were only ever set from the removed business-level picker, and the discount
+      // code now has its own box in the menu tab (see MenuManager.tsx) — never touched from here.
       region: business.region,
-      city: f.city,
-      city_ar: f.city,
-      district: f.district,
-      district_ar: f.district,
-      address: f.address,
-      address_ar: f.address,
-      lat: f.lat,
-      lng: f.lng,
+      city: business.city,
+      city_ar: business.city_ar,
+      district: business.district,
+      district_ar: business.district_ar,
+      address: business.address,
+      address_ar: business.address_ar,
+      lat: business.lat,
+      lng: business.lng,
       hours: Object.fromEntries(Object.entries(f.hours).filter(([, v]) => v.trim() !== "")),
-      discount_code: f.discount_code,
+      discount_code: business.discount_code,
       no_location: f.no_location,
       safety: f.safety,
       shared_kitchen: f.shared_kitchen,
@@ -270,19 +268,6 @@ export function BusinessInfoForm({
           </p>
         </Card>
 
-        <Card title="أكواد الخصم">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="كود الخصم النشط (اختياري)" hint="كود واحد فقط. اتركه فارغاً لإيقافه.">
-              <input
-                maxLength={80}
-                value={f.discount_code}
-                onChange={(e) => set("discount_code", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </div>
-        </Card>
-
         <Card title="الموقع">
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
             <input
@@ -298,42 +283,10 @@ export function BusinessInfoForm({
               </span>
             </span>
           </label>
-          {!f.no_location && (
-            <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المدينة *">
-                  <input
-                    required
-                    maxLength={100}
-                    value={f.city}
-                    onChange={(e) => set("city", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="الحي">
-                  <input
-                    maxLength={100}
-                    value={f.district}
-                    onChange={(e) => set("district", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="العنوان">
-                  <input
-                    maxLength={300}
-                    value={f.address}
-                    onChange={(e) => set("address", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-              </div>
-              <LocationPicker
-                lat={f.lat}
-                lng={f.lng}
-                onPick={(lat, lng) => setF((prev) => ({ ...prev, lat, lng }))}
-              />
-            </>
-          )}
+          <p className="text-xs text-muted-foreground">
+            موقع كل فرع (المدينة، الحي، العنوان، الموقع على الخريطة) يُدار من تبويب «الفروع» الآن —
+            لكل فرع موقعه الخاص.
+          </p>
         </Card>
 
         {!f.no_location && (

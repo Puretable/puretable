@@ -5,10 +5,11 @@ import { BranchEditor } from "@/components/admin/BranchEditor";
 import { BusinessContactEditor } from "@/components/admin/BusinessContactEditor";
 import { BusinessInfoForm } from "./BusinessInfoForm";
 import { ContactOrderingPreview } from "./ContactOrderingPreview";
-import { MenuManager } from "./MenuManager";
+import { DiscountCodeEditor, MenuManager } from "./MenuManager";
 import { PhotosManager } from "./PhotosManager";
 import {
   deleteMenuItemFn,
+  saveDiscountCodeFn,
   deleteOwnerBranchFn,
   getOwnerBusiness,
   saveMenuItemFn,
@@ -54,6 +55,7 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
   const saveContact = useServerFn(saveOwnerBusinessContactFn);
   const saveItem = useServerFn(saveMenuItemFn);
   const removeItem = useServerFn(deleteMenuItemFn);
+  const saveDiscount = useServerFn(saveDiscountCodeFn);
   const sign = useServerFn(signBusinessUpload);
 
   const business = useQuery({
@@ -248,6 +250,18 @@ export function OwnerWorkspace({ overview, tab }: { overview: OwnerBusiness; tab
             await refresh();
           }}
           sign={(filename) => friendly(sign({ data: { businessId, filename } }))}
+        />
+      )}
+
+      {/* The discount code is never plan-gated — shown below the menu regardless of entitlement. */}
+      {tab === "menu" && (
+        <DiscountCodeEditor
+          discountCode={row.discount_code}
+          disabled={suspended}
+          save={async (code) => {
+            await friendly(saveDiscount({ data: { business_id: businessId, discount_code: code } }));
+            await refresh();
+          }}
         />
       )}
     </div>
