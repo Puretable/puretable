@@ -25,6 +25,7 @@ import {
   type Actor,
 } from "../src/lib/owner-manage.server";
 import {
+  AGREEMENT_TERMS_VERSION,
   BillingFieldsInput,
   MenuItemInput,
   OwnerBranchInput,
@@ -178,22 +179,24 @@ try {
     /Forbidden/,
     "a stranger cannot load another business's agreement",
   );
-  // Simulate a partner who already accepted v1 before the v2 bump (a raw RPC call with the old
-  // version string — this is what every current real partner's row looks like right now).
+  // Simulate a partner who already accepted a PRIOR version before AGREEMENT_TERMS_VERSION's
+  // current bump (a raw RPC call with an older version string — this is what every real partner's
+  // row looked like right before whichever bump is currently live gets deployed).
+  const priorVersion = `legacy-${tag}`;
   ok(
     await owner.client.rpc("accept_partnership_agreement", {
       _business_id: A,
-      _terms_version: "v1",
+      _terms_version: priorVersion,
     }),
   );
   assert.equal(
     ok(await service.from("businesses").select("terms_version").eq("id", A).single())
       .terms_version,
-    "v1",
-    "a pre-bump partner is on v1",
+    priorVersion,
+    "a pre-bump partner is on the prior version",
   );
 
-  // The real gate re-triggers: terms_version ("v1") !== AGREEMENT_TERMS_VERSION ("v2").
+  // The real gate re-triggers: terms_version (prior) !== AGREEMENT_TERMS_VERSION (current).
   ok(await acceptPartnershipAgreement(ownerActor, A, {}, owner.email));
   assert.ok(
     ok(await service.from("businesses").select("terms_accepted_at").eq("id", A).single())
@@ -203,7 +206,11 @@ try {
   const termsAfterBump = ok(
     await service.from("businesses").select("terms_version").eq("id", A).single(),
   ).terms_version;
-  assert.equal(termsAfterBump, "v2", "the real AGREEMENT_TERMS_VERSION constant is v2 on this branch");
+  assert.equal(
+    termsAfterBump,
+    AGREEMENT_TERMS_VERSION,
+    "the business is now on the real, currently-live AGREEMENT_TERMS_VERSION",
+  );
   step("admin-created owner: agreement loads and is acceptable before any billing data exists");
 
   console.log("Agreement evidence trail (agreement_versions / agreement_acceptances)");
@@ -214,20 +221,20 @@ try {
       .eq("business_id", A)
       .order("accepted_at", { ascending: true }),
   );
-  assert.equal(acceptanceRows.length, 2, "the v1 row is kept; a new v2 row is added");
-  assert.equal(acceptanceRows[0].terms_version, "v1");
-  assert.equal(acceptanceRows[1].terms_version, "v2");
+  assert.equal(acceptanceRows.length, 2, "the prior-version row is kept; a new current-version row is added");
+  assert.equal(acceptanceRows[0].terms_version, priorVersion);
+  assert.equal(acceptanceRows[1].terms_version, AGREEMENT_TERMS_VERSION);
   assert.equal(acceptanceRows[1].accepted_by, owner.id);
-  const v2 = ok(
+  const currentVersionRow = ok(
     await service
       .from("agreement_versions")
       .select("text_sha256")
-      .eq("terms_version", "v2")
+      .eq("terms_version", AGREEMENT_TERMS_VERSION)
       .single(),
   );
-  assert.equal(acceptanceRows[1].text_sha256, v2.text_sha256);
+  assert.equal(acceptanceRows[1].text_sha256, currentVersionRow.text_sha256);
   step(
-    "a v1 owner re-prompted by the version bump accepts, is logged as v2 (v1 row untouched), with the version's hash",
+    "an owner re-prompted by a version bump accepts, is logged under the new version (the old row untouched), with the version's hash",
   );
   const latestAcceptance = acceptanceRows[acceptanceRows.length - 1];
 
@@ -285,26 +292,27 @@ try {
     "a confirmation email was attempted (or safely failed) without blocking the already-successful acceptance",
   );
 
-  // Once on v2, the gate's own condition (terms_accepted_at set AND terms_version === current)
-  // is false, so a second real accept call never fires from the UI — it isn't a loop by
-  // construction. Re-reading the row confirms the state that condition checks against.
+  // Once on the current version, the gate's own condition (terms_accepted_at set AND
+  // terms_version === current) is false, so a second real accept call never fires from the UI —
+  // it isn't a loop by construction. Re-reading the row confirms the state that condition checks.
   assert.equal(
     ok(await service.from("businesses").select("terms_version").eq("id", A).single())
       .terms_version,
-    "v2",
+    AGREEMENT_TERMS_VERSION,
     "after accepting, the business is on the current version — the gate's re-trigger condition is now false",
   );
   step("a business already on the current version is not re-prompted (no loop)");
 
-  // A future version bump beyond v2 (not seeded here — this simulates it) must still add a new row
-  // and keep both older ones, never overwrite them.
+  // A future version bump beyond the current one (not seeded here — this simulates it) must still
+  // add a new row and keep both older ones, never overwrite them.
+  const nextVersion = `next-${tag}`;
   ok(
     await owner.client.rpc("accept_partnership_agreement", {
       _business_id: A,
-      _terms_version: "v3-simulated",
+      _terms_version: nextVersion,
     }),
   );
-  const acceptanceRowsAfterV3 = ok(
+  const acceptanceRowsAfterNext = ok(
     await service
       .from("agreement_acceptances")
       .select("terms_version")
@@ -312,8 +320,8 @@ try {
       .order("accepted_at", { ascending: true }),
   );
   assert.deepEqual(
-    acceptanceRowsAfterV3.map((r) => r.terms_version),
-    ["v1", "v2", "v3-simulated"],
+    acceptanceRowsAfterNext.map((r) => r.terms_version),
+    [priorVersion, AGREEMENT_TERMS_VERSION, nextVersion],
     "both earlier acceptance rows are kept; a new row is added for the new version",
   );
   step("accepting a further new version adds a row and never overwrites or removes the previous ones");
