@@ -14,7 +14,8 @@ export type NotificationType =
   | "waitlist_admin"
   | "waitlist_receipt"
   | "complaint_admin"
-  | "complaint_receipt";
+  | "complaint_receipt"
+  | "agreement_accepted";
 
 type SendNotificationInput = {
   eventKey: string;
@@ -119,6 +120,55 @@ export async function notifyContactSubmission(input: {
     );
   }
   await Promise.allSettled(jobs);
+}
+
+const RIYADH_DATETIME = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "Asia/Riyadh",
+});
+
+/**
+ * Confirmation email after a successful agreement acceptance — sent best-effort by the caller
+ * (owner-manage.server.ts), which must never let a failure here block or undo the acceptance
+ * itself, since the database write has already succeeded by the time this runs. Same
+ * rate-limit-free, idempotent-by-eventKey pattern as every other notification in this file; no IP
+ * address or user agent is collected or sent.
+ */
+export async function notifyAgreementAccepted(input: {
+  businessId: string;
+  businessName: string;
+  ownerEmail: string;
+  termsVersion: string;
+  acceptedAt: Date;
+}) {
+  const when = RIYADH_DATETIME.format(input.acceptedAt);
+  await sendNotification({
+    eventKey: `agreement/${input.businessId}/${input.termsVersion}`,
+    type: "agreement_accepted",
+    to: input.ownerEmail,
+    subject: `تأكيد الموافقة على اتفاقية الشراكة — ${input.businessName}`,
+    content: {
+      preheader: "تم تسجيل موافقتك على اتفاقية الشراكة والإدراج والاشتراك في Pure Table.",
+      title: "تم تسجيل موافقتك",
+      intro:
+        `نؤكد استلام موافقتك على اتفاقية الشراكة والإدراج والاشتراك في منصة Pure Table ` +
+        `نيابة عن "${input.businessName}". هذه الرسالة إثبات لحفظك.`,
+      details: [
+        { label: "المنشأة", value: input.businessName },
+        { label: "وقت الموافقة (بتوقيت الرياض)", value: when },
+        { label: "إصدار الاتفاقية", value: input.termsVersion },
+      ],
+      action: {
+        label: "عرض نص الاتفاقية الكامل",
+        url: `${siteOrigin()}/agreement-text/${input.termsVersion}`,
+      },
+    },
+    metadata: { business_id: input.businessId, terms_version: input.termsVersion },
+  });
 }
 
 export async function notifyComplaintSubmission(input: {

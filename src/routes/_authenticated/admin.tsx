@@ -37,7 +37,7 @@ const groups = [
     title: "إدارة المنصة",
     links: [
       { to: "/admin", label: "نظرة عامة وتحليلات", icon: LayoutDashboard, exact: true },
-      { to: "/admin/businesses", label: "الأعمال والفروع", icon: Store, exact: false },
+      { to: "/admin/businesses", label: "الأعمال", icon: Store, exact: false },
       { to: "/admin/categories", label: "التصنيفات", icon: Tags, exact: false },
       { to: "/admin/subscriptions", label: "الاشتراكات والباقات", icon: Layers, exact: false },
       { to: "/admin/business-info", label: "بيانات الفوترة", icon: ReceiptText, exact: false },

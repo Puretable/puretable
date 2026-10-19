@@ -14,8 +14,10 @@ import {
   deleteOwnerLink,
   getFirstLoginAgreement,
   saveBusinessBillingFields,
+  saveDiscountCode,
   saveMenuItem,
   saveOwnerBranch,
+  saveOwnerBusinessContact,
   saveOwnerLink,
   signOwnerUpload,
   updateOwnerBusiness,
@@ -23,6 +25,7 @@ import {
   type Actor,
 } from "../src/lib/owner-manage.server";
 import {
+  AGREEMENT_TERMS_VERSION,
   BillingFieldsInput,
   MenuItemInput,
   OwnerBranchInput,
@@ -30,6 +33,8 @@ import {
   OwnerLinkInput,
   OwnerPhotosInput,
 } from "../src/lib/owner-manage.schemas";
+import { BusinessContactInput } from "../src/lib/businesses.schemas";
+import { isFeatured } from "../src/lib/services";
 
 const url = process.env["SUPABASE_URL"];
 const ref = process.env["PT_TEST_PROJECT_REF"];
@@ -174,19 +179,180 @@ try {
     /Forbidden/,
     "a stranger cannot load another business's agreement",
   );
-  ok(await acceptPartnershipAgreement(ownerActor, A, {}));
+  // Simulate a partner who already accepted a PRIOR version before AGREEMENT_TERMS_VERSION's
+  // current bump (a raw RPC call with an older version string — this is what every real partner's
+  // row looked like right before whichever bump is currently live gets deployed).
+  const priorVersion = `legacy-${tag}`;
+  ok(
+    await owner.client.rpc("accept_partnership_agreement", {
+      _business_id: A,
+      _terms_version: priorVersion,
+    }),
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("terms_version").eq("id", A).single())
+      .terms_version,
+    priorVersion,
+    "a pre-bump partner is on the prior version",
+  );
+
+  // The real gate re-triggers: terms_version (prior) !== AGREEMENT_TERMS_VERSION (current).
+  ok(await acceptPartnershipAgreement(ownerActor, A, {}, owner.email));
   assert.ok(
     ok(await service.from("businesses").select("terms_accepted_at").eq("id", A).single())
       .terms_accepted_at,
     "an admin-created owner can accept the agreement with no billing_business row at all",
   );
+  const termsAfterBump = ok(
+    await service.from("businesses").select("terms_version").eq("id", A).single(),
+  ).terms_version;
+  assert.equal(
+    termsAfterBump,
+    AGREEMENT_TERMS_VERSION,
+    "the business is now on the real, currently-live AGREEMENT_TERMS_VERSION",
+  );
   step("admin-created owner: agreement loads and is acceptable before any billing data exists");
+
+  console.log("Agreement evidence trail (agreement_versions / agreement_acceptances)");
+  const acceptanceRows = ok(
+    await service
+      .from("agreement_acceptances")
+      .select("*")
+      .eq("business_id", A)
+      .order("accepted_at", { ascending: true }),
+  );
+  assert.equal(acceptanceRows.length, 2, "the prior-version row is kept; a new current-version row is added");
+  assert.equal(acceptanceRows[0].terms_version, priorVersion);
+  assert.equal(acceptanceRows[1].terms_version, AGREEMENT_TERMS_VERSION);
+  assert.equal(acceptanceRows[1].accepted_by, owner.id);
+  const currentVersionRow = ok(
+    await service
+      .from("agreement_versions")
+      .select("text_sha256")
+      .eq("terms_version", AGREEMENT_TERMS_VERSION)
+      .single(),
+  );
+  assert.equal(acceptanceRows[1].text_sha256, currentVersionRow.text_sha256);
+  step(
+    "an owner re-prompted by a version bump accepts, is logged under the new version (the old row untouched), with the version's hash",
+  );
+  const latestAcceptance = acceptanceRows[acceptanceRows.length - 1];
+
+  await rejects(
+    (async () =>
+      ok(
+        await service
+          .from("agreement_acceptances")
+          .update({ terms_version: "hacked" })
+          .eq("id", acceptanceRows[0].id),
+      ))(),
+    /append-only/,
+    "UPDATE on agreement_acceptances (service role)",
+  );
+  await rejects(
+    (async () =>
+      ok(await service.from("agreement_acceptances").delete().eq("id", acceptanceRows[0].id)))(),
+    /append-only/,
+    "DELETE on agreement_acceptances (service role)",
+  );
+  step("agreement_acceptances rows can never be updated or deleted, not even by service role");
+
+  assert.equal(
+    ok(await ownerB.client.from("agreement_acceptances").select("id").eq("business_id", A)).length,
+    0,
+    "another owner cannot read A's acceptance rows",
+  );
+  const craftedInsert = await owner.client
+    .from("agreement_acceptances")
+    .insert({ business_id: A, terms_version: "v1", accepted_by: owner.id });
+  assert.ok(
+    craftedInsert.error,
+    "nobody can insert into agreement_acceptances directly, not even the real owner's own session",
+  );
+  step("RLS: an owner reads only their own business's acceptance rows; nobody writes directly");
+
+  // The confirmation email is fire-and-forget; give it a moment. Either "sent" or "failed" is a
+  // safe outcome here — the recipient is always a QA @example.com address, never a real inbox.
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const delivery = ok(
+    await service
+      .from("email_deliveries")
+      .select("recipient,status")
+      .eq("metadata->>business_id", A)
+      .maybeSingle(),
+  );
+  if (delivery) {
+    assert.ok(
+      delivery.recipient.endsWith("@example.com"),
+      "the confirmation email only ever targets the QA @example.com address, never a real inbox",
+    );
+    assert.ok(["sent", "failed"].includes(delivery.status));
+  }
+  step(
+    "a confirmation email was attempted (or safely failed) without blocking the already-successful acceptance",
+  );
+
+  // Once on the current version, the gate's own condition (terms_accepted_at set AND
+  // terms_version === current) is false, so a second real accept call never fires from the UI —
+  // it isn't a loop by construction. Re-reading the row confirms the state that condition checks.
+  assert.equal(
+    ok(await service.from("businesses").select("terms_version").eq("id", A).single())
+      .terms_version,
+    AGREEMENT_TERMS_VERSION,
+    "after accepting, the business is on the current version — the gate's re-trigger condition is now false",
+  );
+  step("a business already on the current version is not re-prompted (no loop)");
+
+  // A future version bump beyond the current one (not seeded here — this simulates it) must still
+  // add a new row and keep both older ones, never overwrite them.
+  const nextVersion = `next-${tag}`;
+  ok(
+    await owner.client.rpc("accept_partnership_agreement", {
+      _business_id: A,
+      _terms_version: nextVersion,
+    }),
+  );
+  const acceptanceRowsAfterNext = ok(
+    await service
+      .from("agreement_acceptances")
+      .select("terms_version")
+      .eq("business_id", A)
+      .order("accepted_at", { ascending: true }),
+  );
+  assert.deepEqual(
+    acceptanceRowsAfterNext.map((r) => r.terms_version),
+    [priorVersion, AGREEMENT_TERMS_VERSION, nextVersion],
+    "both earlier acceptance rows are kept; a new row is added for the new version",
+  );
+  step("accepting a further new version adds a row and never overwrites or removes the previous ones");
+
+  const acceptedBusinessIds = new Set(
+    (
+      ok(await service.from("businesses").select("id").not("terms_accepted_at", "is", null)) as {
+        id: string;
+      }[]
+    ).map((r) => r.id),
+  );
+  const coveredBusinessIds = new Set(
+    (
+      ok(await service.from("agreement_acceptances").select("business_id")) as {
+        business_id: string;
+      }[]
+    ).map((r) => r.business_id),
+  );
+  const uncovered = [...acceptedBusinessIds].filter((id) => !coveredBusinessIds.has(id));
+  assert.deepEqual(
+    uncovered,
+    [],
+    "every business with terms_accepted_at set has at least one acceptance row (legacy back-fill)",
+  );
+  step(
+    `legacy back-fill: all ${acceptedBusinessIds.size} business(es) with a prior acceptance are covered`,
+  );
 
   console.log("Business information");
   const saved = await updateOwnerBusiness(ownerActor, A, parseInfo(validInfo()));
   assert.equal(saved.name, "QA Cafe Renamed");
-  assert.equal(saved.phone, "+966 11 555 0101");
-  assert.equal(saved.website, "https://qa-cafe.example/");
   assert.equal(saved.hours.sun, "9:00 AM - 10:00 PM");
   const afterSave = ok(
     await service
@@ -203,6 +369,112 @@ try {
     verified: false,
   });
   step("owner edits their listing; plan, slug, publish state and category stay untouched");
+
+  // Single box per field: the owner portal now sends the SAME text for a field and its _ar
+  // counterpart (the UI merged the two boxes into one). The server has no opinion on this — it
+  // simply stores whatever it's given — so this confirms both columns end up identical, matching
+  // what the new UI actually sends on every save.
+  const mirroredName = "مقهى الاختبار الموحّد";
+  await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        name: mirroredName,
+        name_ar: mirroredName,
+        description: "نص موحّد",
+        description_ar: "نص موحّد",
+      }),
+    ),
+  );
+  const mirroredRow = ok(
+    await service.from("businesses").select("name,name_ar,description,description_ar").eq("id", A).single(),
+  );
+  assert.equal(mirroredRow.name, mirroredName);
+  assert.equal(mirroredRow.name_ar, mirroredName);
+  assert.equal(mirroredRow.description, "نص موحّد");
+  assert.equal(mirroredRow.description_ar, "نص موحّد");
+  step("single box per field: saving sends the same text to both the plain and the _ar column");
+
+  console.log("Safety level stays owner-editable; the shared-kitchen note is admin-only");
+  const beforeNote = ok(
+    await service
+      .from("businesses")
+      .select("safety, shared_kitchen, precautions_note, dedicated_gf")
+      .eq("id", A)
+      .single(),
+  );
+
+  const ownerChanged = await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        safety: beforeNote.safety === "green" ? "red" : "green",
+        shared_kitchen: !beforeNote.shared_kitchen,
+      }),
+    ),
+  );
+  assert.notEqual(ownerChanged.safety, beforeNote.safety);
+  assert.equal(ownerChanged.shared_kitchen, !beforeNote.shared_kitchen);
+  step("an owner can change their own safety level and shared-kitchen status, as before");
+
+  const crafted = await updateOwnerBusiness(
+    ownerActor,
+    A,
+    parseInfo(
+      validInfo({
+        safety: ownerChanged.safety,
+        shared_kitchen: ownerChanged.shared_kitchen,
+        precautions_note: "hijacked note",
+      }),
+    ),
+  );
+  assert.equal(crafted.precautions_note, beforeNote.precautions_note);
+  step(
+    "the owner's save endpoint ignores any shared-kitchen note value it is sent, even in a crafted request",
+  );
+
+  await rejects(
+    (async () =>
+      ok(
+        await service.from("businesses").update({ precautions_note: "raw hijack" }).eq("id", A),
+      ))(),
+    /Only an admin may change the shared-kitchen note/,
+    "raw service-role write to precautions_note",
+  );
+  step(
+    "the database itself rejects any change to the shared-kitchen note unless the session is an admin",
+  );
+
+  ok(await service.from("businesses").update({ safety: "none" }).eq("id", A));
+  step("a raw write to the safety level itself (not the note) is not restricted by this trigger");
+
+  await rejects(
+    updateOwnerBusiness(ownerBActor, A, parseInfo(validInfo({ safety: "green" }))),
+    /Forbidden/,
+    "another business's owner changing A's safety/note",
+  );
+  step("another business's owner cannot change this business's safety level or note at all");
+
+  ok(await staff.client.from("businesses").update({ precautions_note: "admin note" }).eq("id", A));
+  assert.equal(
+    ok(await service.from("businesses").select("precautions_note").eq("id", A).single())
+      .precautions_note,
+    "admin note",
+  );
+  step("an admin's own authenticated session can still edit the shared-kitchen note");
+
+  ok(
+    await staff.client
+      .from("businesses")
+      .update({
+        safety: beforeNote.safety,
+        shared_kitchen: beforeNote.shared_kitchen,
+        precautions_note: beforeNote.precautions_note,
+      })
+      .eq("id", A),
+  );
 
   console.log("Tenant isolation");
   await rejects(
@@ -462,6 +734,27 @@ try {
     "branches: add, edit, delete; plan limit enforced; cannot touch another business's branch by id",
   );
 
+  // Single box per field: the branch editor now sends the SAME text for name/name_ar (and
+  // city/city_ar, address/address_ar) — confirm both columns end up identical.
+  const mirroredBranchName = "فرع العليا الموحّد";
+  await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: mirroredBranchName,
+      name_ar: mirroredBranchName,
+      city: "Riyadh",
+      city_ar: "Riyadh",
+    }),
+  );
+  const mirroredBranchRow = ok(
+    await service.from("business_branches").select("name,name_ar").eq("id", b1.id).single(),
+  );
+  assert.equal(mirroredBranchRow.name, mirroredBranchName);
+  assert.equal(mirroredBranchRow.name_ar, mirroredBranchName);
+  step("single box per field: saving a branch sends the same text to both name and name_ar");
+
   console.log("Order & contact links");
   const l1 = await saveOwnerLink(
     ownerActor,
@@ -528,6 +821,172 @@ try {
     "links: add, edit, delete; share text is cleaned; cannot use or touch another business's branch/link",
   );
 
+  console.log("Contact & ordering redesign: business-level contact fields");
+  const contact1 = await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({
+      business_id: A,
+      website: "example.com",
+      instagram: "@QA_Cafe",
+      tiktok: "qa_cafe",
+      email: "hello@qa-cafe.example",
+    }),
+  );
+  assert.equal(contact1.website, "https://example.com/");
+  assert.equal(contact1.instagram, "https://instagram.com/QA_Cafe");
+  assert.equal(contact1.tiktok, "https://tiktok.com/@qa_cafe");
+  assert.equal(contact1.email, "hello@qa-cafe.example");
+  step("business-level contact: website/instagram/tiktok/email save with per-type normalization");
+
+  const contact2 = await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({ business_id: A, tiktok: "qa_cafe_v2" }),
+  );
+  assert.equal(contact2.tiktok, "https://tiktok.com/@qa_cafe_v2");
+  assert.equal(
+    ok(
+      await service
+        .from("business_links")
+        .select("id")
+        .eq("business_id", A)
+        .eq("platform", "tiktok"),
+    ).length,
+    1,
+    "re-saving tiktok updates the one business-level row, never a duplicate",
+  );
+  step("no duplicate business-level link is ever created — the unique index + upsert hold");
+
+  await rejects(
+    saveOwnerBusinessContact(
+      ownerBActor,
+      BusinessContactInput.parse({ business_id: A, website: "https://hijack.example" }),
+    ),
+    /Forbidden/,
+    "another business's owner saving A's contact fields",
+  );
+  step("another business's owner cannot change this business's contact fields");
+
+  // A legacy business-level business_links("website") row, saved before this redesign, must stay
+  // visible to visitors even though the new UI writes to the businesses.website column instead.
+  ok(await service.from("businesses").update({ website: null }).eq("id", A));
+  const legacyWebsite = ok(
+    await service
+      .from("business_links")
+      .insert({
+        business_id: A,
+        branch_id: null,
+        platform: "website",
+        url: "https://legacy.example",
+      })
+      .select("id")
+      .single(),
+  );
+  await saveOwnerBusinessContact(
+    ownerActor,
+    BusinessContactInput.parse({ business_id: A, instagram: "qa_cafe" }),
+  );
+  assert.equal(
+    ok(await service.from("business_links").select("id").eq("id", legacyWebsite.id)).length,
+    1,
+    "the old business_links(website) row is never touched by the new save path",
+  );
+  step("old data (a legacy business-level link row) is never deleted or rewritten by the new path");
+
+  console.log("Contact & ordering redesign: per-branch pickup/delivery/WhatsApp-orders");
+  const brA = await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      phone: "0551234567",
+      whatsapp: "0551234567",
+      maps_url: "https://maps.example/olaya",
+      pickup_enabled: true,
+      delivery_enabled: true,
+      delivery_url: "https://order.qa-cafe.example",
+      whatsapp_orders_enabled: true,
+    }),
+  );
+  assert.equal(brA.phone, "+966551234567");
+  assert.equal(brA.whatsapp, "+966551234567");
+  assert.equal(brA.pickup_enabled, true);
+  assert.equal(brA.delivery_enabled, true);
+  assert.equal(brA.delivery_url, "https://order.qa-cafe.example/");
+  assert.equal(brA.whatsapp_orders_enabled, true);
+  const tagsAfterOn = ok(await service.from("businesses").select("categories").eq("id", A).single())
+    .categories as string[];
+  assert.ok(tagsAfterOn.includes("svc_pickup") && tagsAfterOn.includes("svc_delivery"));
+  step(
+    "a branch's pickup/delivery toggles save, and automatically tag the business for both public filters",
+  );
+
+  await saveOwnerBranch(
+    ownerActor,
+    OwnerBranchInput.parse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      phone: "0551234567",
+      whatsapp: "0551234567",
+      maps_url: "https://maps.example/olaya",
+      whatsapp_orders_enabled: true,
+      pickup_enabled: false,
+      delivery_enabled: false,
+    }),
+  );
+  const tagsAfterOff = ok(
+    await service.from("businesses").select("categories").eq("id", A).single(),
+  ).categories as string[];
+  assert.ok(!tagsAfterOff.includes("svc_pickup") && !tagsAfterOff.includes("svc_delivery"));
+  step("turning both toggles off removes the business from both filters automatically");
+
+  await rejects(
+    (async () =>
+      ok(await ownerB.client.rpc("owner_sync_pickup_delivery_tags", { _business_id: A })))(),
+    /Forbidden/,
+    "another business's owner calling the tag-sync RPC for A",
+  );
+  // RLS silently matches zero rows for a write it denies (no error) — the real proof is that
+  // nothing changed, not the absence of an error.
+  const categoriesBeforeCrafted = ok(
+    await service.from("businesses").select("categories").eq("id", A).single(),
+  ).categories;
+  await owner.client
+    .from("businesses")
+    .update({ categories: ["svc_pickup", "cf_totally-fake-tag"] })
+    .eq("id", A);
+  assert.deepEqual(
+    ok(await service.from("businesses").select("categories").eq("id", A).single()).categories,
+    categoriesBeforeCrafted,
+    "an owner cannot write categories directly at all, by any value — RLS lets the write affect zero rows",
+  );
+  step(
+    "an owner can influence only svc_pickup/svc_delivery, only for their own business, only through the narrow RPC — never any other category tag, never directly",
+  );
+
+  assert.equal(
+    OwnerBranchInput.safeParse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      maps_url: "javascript:alert(1)",
+    }).success,
+    false,
+    "javascript: scheme rejected for maps_url",
+  );
+  assert.equal(
+    OwnerBranchInput.safeParse({
+      business_id: A,
+      id: b1.id,
+      name: "Olaya HQ",
+      delivery_url: "http://not-https.example",
+    }).success,
+    false,
+    "bare http: rejected for delivery_url",
+  );
+  step("maps_url/delivery_url reject non-https schemes (javascript:, data:, bare http:)");
+
   console.log("Gluten-free menu (Free blocked, Pro allowed)");
   await rejects(
     saveMenuItem(
@@ -573,6 +1032,27 @@ try {
   step(
     "menu: a Pro owner adds and edits items, with all three existing safety colours and optional price",
   );
+
+  // Single box per field: the menu editor now sends the SAME text for name/name_ar — confirm both
+  // columns end up identical.
+  const mirroredItemName = "صنف موحّد";
+  await saveMenuItem(
+    ownerActor,
+    parseMenu({
+      business_id: A,
+      id: item.id,
+      name: mirroredItemName,
+      name_ar: mirroredItemName,
+      price: 30,
+      safety: "green",
+    }),
+  );
+  const mirroredItemRow = ok(
+    await service.from("business_menu_items").select("name,name_ar").eq("id", item.id).single(),
+  );
+  assert.equal(mirroredItemRow.name, mirroredItemName);
+  assert.equal(mirroredItemRow.name_ar, mirroredItemName);
+  step("single box per field: saving a menu item sends the same text to both name and name_ar");
 
   assert.ok(
     (
@@ -1320,6 +1800,249 @@ try {
     "sent",
   );
   step("the admin invoice toggle saves immediately and is admin-only");
+
+  console.log("Featured places (Premium OR launch partner, admin-only)");
+  const featuredPremium = await makeBusiness("featured-premium");
+  const featuredPartner = await makeBusiness("featured-partner");
+  ok(await service.from("businesses").update({ plan: "premium" }).eq("id", featuredPremium));
+  assert.equal(isFeatured({ plan: "free" }), false, "a Free business is not featured");
+  assert.equal(
+    isFeatured(
+      ok(await service.from("businesses").select("plan").eq("id", featuredPremium).single()),
+    ),
+    true,
+    "an active Premium business is featured",
+  );
+  step("Premium active -> featured");
+
+  ok(await service.from("businesses").update({ plan: "free" }).eq("id", featuredPremium));
+  assert.equal(
+    isFeatured(
+      ok(await service.from("businesses").select("plan").eq("id", featuredPremium).single()),
+    ),
+    false,
+    "once suspension/expiry reverts the stored plan to free, it drops out of featured automatically",
+  );
+  step("Premium expired/suspended (plan reverted to free) -> not featured");
+
+  const ownerPartnerInsert = await owner.client
+    .from("success_partners")
+    .insert({ kind: "business", business_id: featuredPartner, name: "x", active: true });
+  assert.ok(ownerPartnerInsert.error, "owner cannot mark a business a launch partner");
+  assert.equal(
+    ok(await service.from("success_partners").select("id").eq("business_id", featuredPartner))
+      .length,
+    0,
+    "the rejected owner insert left no row behind",
+  );
+  step("owner cannot write to success_partners (admin-only RLS)");
+
+  const partnerRow = ok(
+    await staff.client
+      .from("success_partners")
+      .insert({
+        kind: "business",
+        business_id: featuredPartner,
+        name: "QA Partner",
+        active: true,
+      })
+      .select("id")
+      .single(),
+  );
+  assert.equal(
+    isFeatured({ plan: "free", isLaunchPartner: true }),
+    true,
+    "a launch partner is featured even on the Free plan",
+  );
+  step("admin can mark a launch partner, and it is featured without Premium");
+
+  await owner.client.from("success_partners").delete().eq("id", partnerRow.id);
+  assert.equal(
+    ok(await service.from("success_partners").select("id").eq("id", partnerRow.id)).length,
+    1,
+    "owner's delete attempt silently affects zero rows — the launch-partner mark stays",
+  );
+  await owner.client
+    .from("success_partners")
+    .update({ active: false })
+    .eq("id", partnerRow.id);
+  assert.equal(
+    ok(await service.from("success_partners").select("active").eq("id", partnerRow.id).single())
+      .active,
+    true,
+    "owner's update attempt silently affects zero rows — still active",
+  );
+  step("owner cannot change featured status in either direction (RLS denies delete/update)");
+
+  ok(await service.from("success_partners").delete().eq("id", partnerRow.id));
+
+  console.log("Branch coordinates: home-business privacy, auto-sync, discount code relocation");
+  const homeBiz = ok(
+    await service
+      .from("businesses")
+      .insert({
+        slug: `qa-self-home-${tag}`,
+        name: `QA Home ${tag}`,
+        category: "home",
+        city: "Riyadh",
+        plan: "free",
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  created.businesses.push(homeBiz.id);
+  const regularBiz = ok(
+    await service
+      .from("businesses")
+      .insert({
+        slug: `qa-self-geo-${tag}`,
+        name: `QA Geo ${tag}`,
+        category: "cafe",
+        city: "Riyadh",
+        plan: "free",
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  created.businesses.push(regularBiz.id);
+  const homeBranch = ok(
+    await service
+      .from("business_branches")
+      .insert({
+        business_id: homeBiz.id,
+        name: "Home branch",
+        city: "Riyadh",
+        lat: 24.7136,
+        lng: 46.6753,
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  const regularBranch = ok(
+    await service
+      .from("business_branches")
+      .insert({
+        business_id: regularBiz.id,
+        name: "Jeddah branch",
+        city: "Jeddah",
+        city_ar: "جدة",
+        lat: 21.4858,
+        lng: 39.1925,
+        published: true,
+      })
+      .select("id")
+      .single(),
+  );
+  step("setup: one home-category business and one regular business, each with a located branch");
+
+  // City/district auto-sync from the branch (removes the need for a business-level location box).
+  assert.equal(
+    ok(await service.from("businesses").select("city,city_ar").eq("id", regularBiz.id).single())
+      .city,
+    "Jeddah",
+    "businesses.city followed the branch's city automatically",
+  );
+  step("businesses.city/city_ar auto-sync from the primary branch (no manual entry needed)");
+
+  // Direct anon reads of lat/lng are refused at the column-grant level — not just hidden in the UI.
+  const publicAnon = anonClient();
+  const anonBusinessCoords = await publicAnon
+    .from("businesses")
+    .select("lat,lng")
+    .eq("id", regularBiz.id);
+  assert.ok(anonBusinessCoords.error, "anon cannot select businesses.lat/lng directly");
+  const anonBranchCoords = await publicAnon
+    .from("business_branches")
+    .select("lat,lng")
+    .eq("id", regularBranch.id);
+  assert.ok(anonBranchCoords.error, "anon cannot select business_branches.lat/lng directly");
+  step("anon has no column grant for lat/lng on businesses or business_branches (not just UI-hidden)");
+
+  // The redacted RPCs: real coordinates for a regular business, null for a home business.
+  const bizCoords = ok(
+    await publicAnon
+      .rpc("public_business_coordinates")
+      .in("business_id", [homeBiz.id, regularBiz.id]),
+  ) as { business_id: string; lat: number | null; lng: number | null }[];
+  const homeBizCoord = bizCoords.find((c) => c.business_id === homeBiz.id);
+  const regularBizCoord = bizCoords.find((c) => c.business_id === regularBiz.id);
+  assert.equal(homeBizCoord?.lat, null, "home business: public_business_coordinates returns null lat");
+  assert.equal(homeBizCoord?.lng, null, "home business: public_business_coordinates returns null lng");
+  assert.equal(regularBizCoord?.lat, null, "a business with no business-level lat/lng stays null");
+
+  const branchCoords = ok(
+    await publicAnon
+      .rpc("public_branch_coordinates")
+      .in("branch_id", [homeBranch.id, regularBranch.id]),
+  ) as { branch_id: string; lat: number | null; lng: number | null }[];
+  const homeBranchCoord = branchCoords.find((c) => c.branch_id === homeBranch.id);
+  const regularBranchCoord = branchCoords.find((c) => c.branch_id === regularBranch.id);
+  assert.equal(homeBranchCoord?.lat, null, "home business's branch: coordinates redacted to null");
+  assert.equal(homeBranchCoord?.lng, null, "home business's branch: coordinates redacted to null");
+  assert.equal(regularBranchCoord?.lat, 21.4858, "a regular business's branch keeps its real lat");
+  assert.equal(regularBranchCoord?.lng, 39.1925, "a regular business's branch keeps its real lng");
+  step(
+    "public_business_coordinates()/public_branch_coordinates(): null for home businesses, real values otherwise",
+  );
+
+  // Owners can only ever touch their own branch's coordinates (existing branch-ownership
+  // enforcement — ties specifically to the new coordinate fields here).
+  const geoOwner = await makeUser("geo-owner");
+  ok(await service.from("business_owners").insert({ business_id: regularBiz.id, email: geoOwner.email }));
+  const strangerGeoAttempt = await saveOwnerBranch(
+    actorFor(geoOwner),
+    OwnerBranchInput.parse({
+      business_id: homeBiz.id,
+      id: homeBranch.id,
+      name: "hijacked",
+      lat: 1,
+      lng: 1,
+    }),
+  ).catch((e: unknown) => e);
+  assert.ok(
+    strangerGeoAttempt instanceof Error,
+    "an owner of a different business cannot edit another business's branch coordinates",
+  );
+  assert.equal(
+    ok(await service.from("business_branches").select("lat").eq("id", homeBranch.id).single()).lat,
+    24.7136,
+    "the home branch's coordinates are untouched",
+  );
+  step("owners can only edit their own branches' coordinates, never another business's");
+
+  // Discount code now saves from its new home (menu tab), shared by owner and admin.
+  await saveDiscountCode(staffActor, { business_id: regularBiz.id, discount_code: "QA10" });
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA10",
+    "admin saves the discount code from its new location",
+  );
+  await saveDiscountCode(actorFor(geoOwner), { business_id: regularBiz.id, discount_code: "QA20" });
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA20",
+    "the business's own owner saves it too",
+  );
+  const foreignDiscountAttempt = await saveDiscountCode(ownerActor, {
+    business_id: regularBiz.id,
+    discount_code: "STOLEN",
+  }).catch((e: unknown) => e);
+  assert.ok(
+    foreignDiscountAttempt instanceof Error,
+    "a different business's owner cannot set this business's discount code",
+  );
+  assert.equal(
+    ok(await service.from("businesses").select("discount_code").eq("id", regularBiz.id).single())
+      .discount_code,
+    "QA20",
+    "unchanged after the rejected attempt",
+  );
+  step("discount code: owner and admin can both save it from the menu tab; another owner cannot");
 
   console.log(`\nAll ${checks} checks passed.`);
 } finally {

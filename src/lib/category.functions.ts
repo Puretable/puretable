@@ -91,26 +91,33 @@ export const adminListPlaceCategories = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.supabase, context.userId);
-    const [{ data: categories, error }, { data: businesses, error: businessError }] =
-      await Promise.all([
-        context.supabase
-          .from("place_categories")
-          .select(
-            "id,value,slug,name_ar,name_en,description_ar,description_en,level,behavior,icon,visible,sort_order",
-          )
-          .order("level")
-          .order("sort_order")
-          .order("created_at"),
-        context.supabase.from("businesses").select("category,categories,offers_booking,plan"),
-      ]);
+    const [
+      { data: categories, error },
+      { data: businesses, error: businessError },
+      { data: launchPartners, error: launchPartnersError },
+    ] = await Promise.all([
+      context.supabase
+        .from("place_categories")
+        .select(
+          "id,value,slug,name_ar,name_en,description_ar,description_en,level,behavior,icon,visible,sort_order",
+        )
+        .order("level")
+        .order("sort_order")
+        .order("created_at"),
+      context.supabase.from("businesses").select("id,category,categories,offers_booking,plan"),
+      context.supabase.from("success_partners").select("business_id").eq("kind", "business").eq("active", true),
+    ]);
     if (error) throw new Error(error.message);
     if (businessError) throw new Error(businessError.message);
+    if (launchPartnersError) throw new Error(launchPartnersError.message);
+    const launchPartnerIds = new Set((launchPartners ?? []).map((p) => p.business_id));
 
     return ((categories ?? []) as PlaceCategory[]).map((category) => ({
       ...category,
       usage_count: (businesses ?? []).filter((business) => {
         if (category.behavior === "booking") return business.offers_booking;
-        if (category.behavior === "featured") return business.plan === "premium";
+        if (category.behavior === "featured")
+          return business.plan === "premium" || launchPartnerIds.has(business.id);
         if (category.behavior === "nearby") return false;
         return (
           business.category === category.value ||

@@ -26,6 +26,12 @@ export type BusinessBillingRow = {
   invoice_representative_title: string | null;
   terms_accepted_at: string | null;
   terms_version: string | null;
+  /** Append-only evidence trail — newest first. "legacy" entries have accepted_by_email === null. */
+  acceptance_history: {
+    terms_version: string;
+    accepted_at: string;
+    accepted_by_email: string | null;
+  }[];
   payment_status: "not_required" | "unpaid" | "pending" | "paid" | "failed" | "refunded" | null;
   subscription_status:
     "pending" | "active" | "suspended" | "expired" | "superseded" | "cancelled" | "rejected" | null;

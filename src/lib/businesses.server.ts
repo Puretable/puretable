@@ -37,15 +37,30 @@ export function publicClient() {
 // before it can reach a public response.
 // Must exactly match the anon grant in supabase/migrations/20261015120000_fix_businesses_column_grants.sql
 // (no needs_review/review_notes — admin-only moderation fields, not granted to anon).
+// lat/lng are deliberately NOT here: anon no longer has a column grant for them (see
+// supabase/test-sync/20261021_branch_location_privacy_and_sync.sql) — they're fetched separately
+// via public_business_coordinates()/public_branch_coordinates(), which null them out for
+// home-category businesses. This is the actual privacy boundary, not just a UI choice.
 export const PUBLIC_BUSINESS_COLUMNS =
-  "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,lat,lng,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,terms_accepted_at,terms_version,business_info_completed";
+  "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,terms_accepted_at,terms_version,business_info_completed";
 
-// Same as PUBLIC_BUSINESS_COLUMNS, plus the two internal moderation fields that only the
-// `authenticated` role (owners, admins — anyone logged in) is granted, never anon. Any
-// authenticated-context query against `businesses` (admin CRUD, owner self-service saves) must use
-// this instead of select("*")/bare select() — those now fail outright for any role without a
-// blanket table-level grant, which no longer exists on this table after the billing-column fix.
-export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},needs_review,review_notes`;
+// Same as PUBLIC_BUSINESS_COLUMNS, plus lat/lng (authenticated keeps full column access — only anon
+// was narrowed) and the two internal moderation fields that only the `authenticated` role (owners,
+// admins — anyone logged in) is granted, never anon. Any authenticated-context query against
+// `businesses` (admin CRUD, owner self-service saves) must use this instead of select("*")/bare
+// select() — those now fail outright for any role without a blanket table-level grant, which no
+// longer exists on this table after the billing-column fix.
+export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},lat,lng,needs_review,review_notes`;
+
+// Explicit allowlist for public (anon) reads of `business_branches` — lat/lng excluded for the same
+// reason as above; fetched separately and redacted for home businesses.
+const PUBLIC_BRANCH_COLUMNS =
+  "id,business_id,place_id,name,name_ar,address,address_ar,city,city_ar,district,district_ar,region,maps_url,phone,whatsapp,hours,sort_order,permanently_closed,published,plan_limited,pickup_enabled,delivery_enabled,delivery_url,whatsapp_orders_enabled,created_at,updated_at";
+
+// saveBusinessContact lives in business-contact.server.ts, not here: this file imports from
+// @/data/businesses, which imports image assets directly — fine under Vite, but it breaks plain
+// `tsx` execution (scripts/verify-owner-self-service.ts). Re-exported below for convenience.
+export { saveBusinessContact } from "./business-contact.server";
 
 function mapLink(link: Record<string, unknown>): BusinessLink {
   return {
@@ -63,7 +78,14 @@ function str(v: unknown): string | null {
   return typeof v === "string" && v.length ? v : null;
 }
 
-function mapBranch(row: Record<string, unknown>, links: BusinessLink[] = []): Branch {
+type BusinessCoordRow = { business_id: string; lat: number | null; lng: number | null };
+type BranchCoordRow = { branch_id: string; lat: number | null; lng: number | null };
+
+function mapBranch(
+  row: Record<string, unknown>,
+  links: BusinessLink[] = [],
+  coords?: { lat: number | null; lng: number | null },
+): Branch {
   const h = (row.hours ?? {}) as Partial<OpeningHours>;
   const name = String(row.name ?? "");
   const address = str(row.address) ?? "";
@@ -79,8 +101,10 @@ function mapBranch(row: Record<string, unknown>, links: BusinessLink[] = []): Br
     city_i18n: { en: city ?? "", ar: str(row.city_ar) ?? city ?? "" },
     district,
     district_i18n: district ? { en: district, ar: str(row.district_ar) ?? district } : undefined,
-    lat: typeof row.lat === "number" ? row.lat : null,
-    lng: typeof row.lng === "number" ? row.lng : null,
+    // Not selected directly for anon (see PUBLIC_BRANCH_COLUMNS) — passed in separately from
+    // public_branch_coordinates(), which nulls them out for home-category businesses.
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
     mapsUrl: str(row.maps_url),
     phone: str(row.phone),
     whatsapp: str(row.whatsapp),
@@ -96,6 +120,10 @@ function mapBranch(row: Record<string, unknown>, links: BusinessLink[] = []): Br
     permanentlyClosed: !!row.permanently_closed,
     sort_order: typeof row.sort_order === "number" ? row.sort_order : 0,
     links: links.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    pickupEnabled: !!row.pickup_enabled,
+    deliveryEnabled: !!row.delivery_enabled,
+    deliveryUrl: str(row.delivery_url),
+    whatsappOrdersEnabled: !!row.whatsapp_orders_enabled,
   };
 }
 
@@ -105,6 +133,9 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
     { data: rows, error: businessesError },
     { data: links, error: linksError },
     { data: branches, error: branchesError },
+    { data: launchPartners, error: launchPartnersError },
+    { data: businessCoords, error: businessCoordsError },
+    { data: branchCoords, error: branchCoordsError },
     catalog,
     packagesEnabled,
   ] = await Promise.all([
@@ -113,13 +144,37 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
       .select(PUBLIC_BUSINESS_COLUMNS)
       .order("created_at", { ascending: true }),
     client.from("business_links").select("*"),
-    client.from("business_branches").select("*").eq("published", true),
+    client.from("business_branches").select(PUBLIC_BRANCH_COLUMNS).eq("published", true),
+    client.from("success_partners").select("business_id").eq("kind", "business").eq("active", true),
+    client.rpc("public_business_coordinates") as unknown as Promise<{
+      data: BusinessCoordRow[] | null;
+      error: { message: string } | null;
+    }>,
+    client.rpc("public_branch_coordinates") as unknown as Promise<{
+      data: BranchCoordRow[] | null;
+      error: { message: string } | null;
+    }>,
     readPlanCatalog(client),
     isPackagesEnabled(client),
   ]);
   if (businessesError) throw new Error(businessesError.message);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
+  if (launchPartnersError) throw new Error(launchPartnersError.message);
+  if (businessCoordsError) throw new Error(businessCoordsError.message);
+  if (branchCoordsError) throw new Error(branchCoordsError.message);
+  const launchPartnerIds = new Set(
+    (launchPartners ?? []).map((p) => p.business_id as string).filter(Boolean),
+  );
+  // Coordinates, pre-redacted server-side for home businesses (see public_business_coordinates()/
+  // public_branch_coordinates() in supabase/test-sync/20261021_branch_location_privacy_and_sync.sql)
+  // — never read lat/lng off the raw business/branch rows for a public response.
+  const businessCoordsById = new Map(
+    (businessCoords ?? []).map((c) => [c.business_id, { lat: c.lat, lng: c.lng }]),
+  );
+  const branchCoordsById = new Map(
+    (branchCoords ?? []).map((c) => [c.branch_id, { lat: c.lat, lng: c.lng }]),
+  );
   // Links with a branch_id belong to that branch; the rest to the business itself.
   const byBusiness = new Map<string, BusinessLink[]>();
   const byBranch = new Map<string, BusinessLink[]>();
@@ -134,7 +189,7 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
   const branchesByBusiness = new Map<string, Branch[]>();
   for (const branch of branches ?? []) {
     const current = branchesByBusiness.get(branch.business_id) ?? [];
-    current.push(mapBranch(branch, byBranch.get(branch.id) ?? []));
+    current.push(mapBranch(branch, byBranch.get(branch.id) ?? [], branchCoordsById.get(branch.id)));
     branchesByBusiness.set(branch.business_id, current);
   }
   return (rows ?? []).map((row) => ({
@@ -143,6 +198,9 @@ export async function fetchPublicBusinesses(): Promise<Business[]> {
       byBusiness.get(row.id) ?? [],
       branchesByBusiness.get(row.id) ?? [],
     ),
+    lat: businessCoordsById.get(row.id)?.lat ?? null,
+    lng: businessCoordsById.get(row.id)?.lng ?? null,
+    isLaunchPartner: launchPartnerIds.has(row.id),
     entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
   }));
 }
@@ -159,16 +217,46 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
   const [
     { data: links, error: linksError },
     { data: branches, error: branchesError },
+    { data: launchPartner, error: launchPartnerError },
+    { data: businessCoords, error: businessCoordsError },
     catalog,
     packagesEnabled,
   ] = await Promise.all([
     client.from("business_links").select("*").eq("business_id", row.id),
-    client.from("business_branches").select("*").eq("business_id", row.id).eq("published", true),
+    client
+      .from("business_branches")
+      .select(PUBLIC_BRANCH_COLUMNS)
+      .eq("business_id", row.id)
+      .eq("published", true),
+    client
+      .from("success_partners")
+      .select("business_id")
+      .eq("kind", "business")
+      .eq("active", true)
+      .eq("business_id", row.id)
+      .maybeSingle(),
+    client.rpc("public_business_coordinates").eq("business_id", row.id).maybeSingle() as unknown as Promise<{
+      data: BusinessCoordRow | null;
+      error: { message: string } | null;
+    }>,
     readPlanCatalog(client),
     isPackagesEnabled(client),
   ]);
   if (linksError) throw new Error(linksError.message);
   if (branchesError) throw new Error(branchesError.message);
+  if (launchPartnerError) throw new Error(launchPartnerError.message);
+  if (businessCoordsError) throw new Error(businessCoordsError.message);
+  const branchIds = (branches ?? []).map((b) => b.id as string);
+  const { data: branchCoords, error: branchCoordsError } = branchIds.length
+    ? ((await client.rpc("public_branch_coordinates").in("branch_id", branchIds)) as unknown as {
+        data: BranchCoordRow[] | null;
+        error: { message: string } | null;
+      })
+    : { data: [] as BranchCoordRow[], error: null };
+  if (branchCoordsError) throw new Error(branchCoordsError.message);
+  const branchCoordsById = new Map(
+    (branchCoords ?? []).map((c) => [c.branch_id, { lat: c.lat, lng: c.lng }]),
+  );
   const menu = packagesEnabled && !canUseMenu(row) ? [] : await fetchPublicMenu(client, row.id);
   const mappedLinks = (links ?? []).map(mapLink);
   const business = mapDbBusiness(
@@ -178,12 +266,16 @@ export async function fetchPublicBusinessBySlug(slug: string): Promise<Business 
       mapBranch(
         b,
         mappedLinks.filter((l) => l.branch_id === b.id),
+        branchCoordsById.get(b.id),
       ),
     ),
   );
   return {
     ...business,
+    lat: businessCoords?.lat ?? null,
+    lng: businessCoords?.lng ?? null,
     menu,
+    isLaunchPartner: !!launchPartner,
     entitlements: packagesEnabled ? toFeatures(catalog[planOf(row)]) : toFeatures(catalog.premium),
   };
 }

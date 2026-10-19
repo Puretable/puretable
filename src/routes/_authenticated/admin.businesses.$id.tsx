@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import {
   adminGetBusiness,
+  adminSaveBusinessContact,
   upsertBusiness,
   upsertLink,
   deleteLink,
@@ -17,12 +18,13 @@ import {
 } from "@/lib/businesses.functions";
 import { signCoverUploadUrl } from "@/lib/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { LocationPicker } from "@/components/admin/LocationPicker";
 import { BranchEditor } from "@/components/admin/BranchEditor";
+import { BusinessContactEditor } from "@/components/admin/BusinessContactEditor";
 import { LinksEditor } from "@/components/admin/LinksEditor";
-import { MAIN_CITIES, findCity, regionForCity } from "@/lib/saudi";
+import { regionForCity } from "@/lib/saudi";
 import { adminListPlaceCategories } from "@/lib/category.functions";
 import { useSiteText } from "@/hooks/use-site-settings";
+import { pickBilingual } from "@/lib/bilingual";
 
 import { logAudit } from "@/lib/audit";
 import { getBusinessReport } from "@/lib/analytics.dashboard.functions";
@@ -105,6 +107,7 @@ function EditBusiness() {
   const save = useServerFn(upsertBusiness);
   const saveLink = useServerFn(upsertLink);
   const removeLink = useServerFn(deleteLink);
+  const saveContact = useServerFn(adminSaveBusinessContact);
   const saveBranch = useServerFn(upsertBranch);
   const removeBranch = useServerFn(deleteBranch);
   const signUpload = useServerFn(signCoverUploadUrl);
@@ -143,6 +146,10 @@ function EditBusiness() {
       setForm({
         ...DEFAULT_FORM,
         ...existing,
+        // One box per field: prefill from whichever language already has text (Arabic first).
+        name: pickBilingual((existing as any).name_ar, existing.name),
+        description: pickBilingual((existing as any).description_ar, existing.description),
+        address: pickBilingual((existing as any).address_ar, (existing as any).address),
         categories: [
           ...new Set(
             [
@@ -160,6 +167,8 @@ function EditBusiness() {
   }, [existing]);
 
   const links = existing?.business_links ?? [];
+  const bizTiktok = links.find((l: any) => l.platform === "tiktok" && !l.branch_id)?.url ?? null;
+  const bizEmail = links.find((l: any) => l.platform === "email" && !l.branch_id)?.url ?? null;
   const branches = ((existing as any)?.business_branches ?? [])
     .slice()
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -172,10 +181,6 @@ function EditBusiness() {
   const selectedCategories: string[] = [
     ...new Set<string>([form.category, ...(form.categories ?? [])].filter(Boolean)),
   ];
-  const selectedCities: string[] = [
-    ...new Set<string>([form.city, ...(form.cities ?? [])].filter(Boolean)),
-  ];
-
   function up<K extends string>(k: K, v: any) {
     setForm((f: any) => ({ ...f, [k]: v }));
   }
@@ -193,25 +198,6 @@ function EditBusiness() {
         category: subs[0] ?? f.category,
         categories: next,
         offers_booking: behavior === "booking" ? next.includes(cat) : f.offers_booking,
-      };
-    });
-  }
-
-  /** Tick / untick a city. At least one city always stays selected. */
-  function toggleCity(cityEn: string) {
-    setForm((f: any) => {
-      const current = [...new Set<string>([f.city, ...(f.cities ?? [])].filter(Boolean))];
-      const next = current.includes(cityEn)
-        ? current.filter((c) => c !== cityEn)
-        : [...current, cityEn];
-      if (next.length === 0) return f;
-      const main = findCity(next[0]!);
-      return {
-        ...f,
-        city: main?.en ?? next[0],
-        city_ar: main?.ar ?? next[0],
-        region: main?.region ?? null,
-        cities: next,
       };
     });
   }
@@ -236,13 +222,17 @@ function EditBusiness() {
       const payload = { ...form };
       payload.published = publish;
       payload.region = regionKey;
+      // One box per field: name/description/address are a single input here (no separate Arabic
+      // box), so the same text is mirrored into the _ar column on save — see BusinessInfoForm.tsx
+      // (owner portal) for the same pattern.
+      payload.name_ar = payload.name;
+      payload.description_ar = payload.description;
       payload.category = selectedSubs[0];
       payload.categories = selectedCategories;
       payload.offers_booking = mainOptions.some(
         (category) =>
           category.behavior === "booking" && selectedCategories.includes(category.value),
       );
-      payload.cities = selectedCities;
       payload.dedicated_gf = payload.safety === "green";
       if (payload.no_location) {
         payload.lat = null;
@@ -554,29 +544,9 @@ function EditBusiness() {
               )}
             </div>
 
-            {/* Same pattern for cities — a chain can be ticked in several cities. */}
-            <div className="col-span-full space-y-2">
-              <div className="text-sm font-medium">
-                المدن / Cities{" "}
-                <span className="text-xs text-muted-foreground">(اختر أكثر من مدينة)</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {MAIN_CITIES.map((c) => {
-                  const on = selectedCities.includes(c.en);
-                  return (
-                    <button
-                      key={c.en}
-                      type="button"
-                      onClick={() => toggleCity(c.en)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium ${on ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}
-                    >
-                      {on ? "✓ " : "+ "}
-                      {c.ar}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* City/district are no longer ticked here — every branch has its own location, and
+                businesses.city/city_ar/district/district_ar now follow the business's primary
+                branch automatically (see sync_business_location_from_branches). */}
             <div className="col-span-full space-y-2">
               <div className="text-sm font-medium">مستوى الأمان / Safety level</div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -700,7 +670,9 @@ function EditBusiness() {
       </form>
 
       {!isNew && <BusinessOwnersPanel businessId={id} />}
-      {!isNew && <AdminMenuPanel businessId={id} />}
+      {!isNew && (
+        <AdminMenuPanel businessId={id} discountCode={form.discount_code ?? null} />
+      )}
 
       {!isNew && (
         <Section title="Action buttons (order & contact links)">
@@ -725,17 +697,8 @@ function EditBusiness() {
         </Section>
       )}
 
-      <Section title="Contact & location">
+      <Section title="Location">
         <Grid>
-          <Input
-            label="كود الخصم النشط (اختياري) / Active discount code"
-            value={form.discount_code ?? ""}
-            onChange={(v) => up("discount_code", v)}
-            className="sm:col-span-2"
-          />
-          <p className="col-span-full -mt-2 text-xs text-muted-foreground">
-            كود واحد فقط لكل نشاط. اترك الخانة فارغة لإيقافه.
-          </p>
           <label className="col-span-full flex items-start gap-2 rounded-xl border border-border p-3 text-sm">
             <input
               type="checkbox"
@@ -753,45 +716,30 @@ function EditBusiness() {
               </span>
             </span>
           </label>
-          <Input label="Phone" value={form.phone ?? ""} onChange={(v) => up("phone", v)} />
-          <Input
-            label="واتساب / WhatsApp (رقم أو رابط)"
-            value={form.whatsapp ?? ""}
-            onChange={(v) => up("whatsapp", v)}
-          />
-          <Input
-            label="Instagram handle (without @)"
-            value={form.instagram ?? ""}
-            onChange={(v) => up("instagram", v)}
-          />
-          <Input label="Website" value={form.website ?? ""} onChange={(v) => up("website", v)} />
-          {/* Shared kitchen (orange dot) now lives with the safety level options above. */}
-
-          {!form.no_location && (
-            <>
-              <Input
-                label="العنوان / Address"
-                value={form.address ?? ""}
-                onChange={(v) => up("address", v)}
-                className="sm:col-span-2"
-              />
-              {/* Coordinates are set by the map picker below, never typed by hand. */}
-
-              <Input
-                label="Directions link (paste from Directions)"
-                value={form.maps_url ?? ""}
-                onChange={(v) => up("maps_url", v)}
-                className="sm:col-span-2"
-              />
-              <LocationPicker
-                lat={form.lat}
-                lng={form.lng}
-                onPick={(lat, lng) => setForm((f: any) => ({ ...f, lat, lng }))}
-              />
-            </>
-          )}
+          {/* Phone, WhatsApp, website, Instagram, TikTok, email, directions, address and the
+              discount code moved to the per-branch fields below, the "طرق التواصل المشتركة"
+              section, and the menu tab (discount code) — editing them here used to silently
+              diverge from what the public page actually reads. City/district/address are now
+              per-branch only; businesses.city/city_ar/district/district_ar follow the primary
+              branch automatically. */}
         </Grid>
       </Section>
+
+      {!isNew && (
+        <Section title="طرق التواصل المشتركة (business-level)">
+          <BusinessContactEditor
+            businessId={id}
+            website={form.website ?? null}
+            instagram={form.instagram ?? null}
+            tiktok={bizTiktok}
+            email={bizEmail}
+            onSave={async (input) => {
+              await saveContact({ data: input });
+              await qc.invalidateQueries({ queryKey: ["admin-business", id] });
+            }}
+          />
+        </Section>
+      )}
 
       {!isNew && (
         <Section title="الفروع / Branches">
@@ -800,6 +748,7 @@ function EditBusiness() {
             city={form.city}
             existing={branches}
             plan={selectedPlan}
+            businessWhatsapp={form.whatsapp}
             onSave={async (row) => {
               await saveBranch({ data: row });
               await qc.invalidateQueries({ queryKey: ["admin-business", id] });

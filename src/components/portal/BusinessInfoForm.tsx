@@ -1,6 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { LocationPicker } from "@/components/admin/LocationPicker";
 import { useSiteText } from "@/hooks/use-site-settings";
 import {
   DAY_KEYS,
@@ -9,6 +8,7 @@ import {
   type OwnerBusinessDetail,
 } from "@/lib/owner-manage.schemas";
 import { friendlyPortalError } from "@/lib/owner-portal";
+import { pickBilingual } from "@/lib/bilingual";
 
 const DAY_LABELS: Record<(typeof DAY_KEYS)[number], string> = {
   sun: "الأحد",
@@ -19,7 +19,6 @@ const DAY_LABELS: Record<(typeof DAY_KEYS)[number], string> = {
   fri: "الجمعة",
   sat: "السبت",
 };
-const DEFAULT_SHARED_NOTE = "مطبخ مشترك لكن المطبخ والأدوات مفصولة";
 const FIELD_LABELS: Record<string, string> = {
   name: "الاسم",
   city: "المدينة",
@@ -68,29 +67,13 @@ export function BusinessInfoForm({
   disabled?: boolean;
 }) {
   const { text } = useSiteText();
-  const s = (v: string | null | undefined) => v ?? "";
+  // One box per field: Arabic and English used to be separate inputs writing to separate columns.
+  // Now there is a single box per field, prefilled from whichever language already has text
+  // (Arabic first), and on save the same text is written to both columns — see submit() below.
   const [f, setF] = useState({
-    name: business.name,
-    name_ar: s(business.name_ar),
-    description: s(business.description),
-    description_ar: s(business.description_ar),
-    products: s(business.products),
-    products_ar: s(business.products_ar),
-    city: business.city,
-    city_ar: s(business.city_ar),
-    district: s(business.district),
-    district_ar: s(business.district_ar),
-    address: s(business.address),
-    address_ar: s(business.address_ar),
-    phone: s(business.phone),
-    whatsapp: s(business.whatsapp),
-    instagram: s(business.instagram),
-    website: s(business.website),
-    maps_url: s(business.maps_url),
-    discount_code: s(business.discount_code),
-    precautions_note: s(business.precautions_note),
-    lat: business.lat,
-    lng: business.lng,
+    name: pickBilingual(business.name_ar, business.name),
+    description: pickBilingual(business.description_ar, business.description),
+    products: pickBilingual(business.products_ar, business.products),
     no_location: business.no_location,
     safety: business.safety as SafetyLevel,
     shared_kitchen: business.shared_kitchen,
@@ -110,32 +93,36 @@ export function BusinessInfoForm({
     if (busy || disabled) return;
     const parsed = OwnerBusinessInput.safeParse({
       name: f.name,
-      name_ar: f.name_ar,
+      name_ar: f.name,
       description: f.description,
-      description_ar: f.description_ar,
+      description_ar: f.description,
       products: f.products,
-      products_ar: f.products_ar,
+      products_ar: f.products,
+      // City/district are no longer typed here — every branch already has its own location, and
+      // businesses.city/city_ar/district/district_ar now follow the primary branch automatically
+      // (see the sync_business_location_from_branches trigger). Address/lat/lng/discount_code are
+      // likewise passed through unchanged: address has no owner-facing box left (location lives per
+      // branch), lat/lng were only ever set from the removed business-level picker, and the discount
+      // code now has its own box in the menu tab (see MenuManager.tsx) — never touched from here.
       region: business.region,
-      city: f.city,
-      city_ar: f.city_ar,
-      district: f.district,
-      district_ar: f.district_ar,
-      address: f.address,
-      address_ar: f.address_ar,
-      lat: f.lat,
-      lng: f.lng,
-      phone: f.phone,
-      whatsapp: f.whatsapp,
-      instagram: f.instagram,
-      website: f.website,
-      maps_url: f.maps_url,
+      city: business.city,
+      city_ar: business.city_ar,
+      district: business.district,
+      district_ar: business.district_ar,
+      address: business.address,
+      address_ar: business.address_ar,
+      lat: business.lat,
+      lng: business.lng,
       hours: Object.fromEntries(Object.entries(f.hours).filter(([, v]) => v.trim() !== "")),
-      discount_code: f.discount_code,
+      discount_code: business.discount_code,
       no_location: f.no_location,
       safety: f.safety,
       shared_kitchen: f.shared_kitchen,
       dedicated_gf: f.dedicated_gf,
-      precautions_note: f.shared_kitchen ? f.precautions_note : null,
+      // The shared-kitchen note is admin-only (set from the admin pages) — the owner can see it
+      // below but not change it, so it is always passed through unchanged from the business's
+      // current stored value, never from editable form state.
+      precautions_note: business.precautions_note,
     });
     if (!parsed.success) {
       setErrors(
@@ -158,17 +145,9 @@ export function BusinessInfoForm({
     setErrors([]);
     try {
       await save(parsed.data);
-      // Show the values exactly as stored (links are normalised to https:// and text is trimmed).
+      // Show the value exactly as stored (text is trimmed).
       const stored = parsed.data;
-      setF((prev) => ({
-        ...prev,
-        name: stored.name,
-        phone: stored.phone ?? "",
-        whatsapp: stored.whatsapp ?? "",
-        instagram: stored.instagram ?? "",
-        website: stored.website ?? "",
-        maps_url: stored.maps_url ?? "",
-      }));
+      setF((prev) => ({ ...prev, name: stored.name }));
       setMessage("تم حفظ بيانات العمل.");
     } catch (e) {
       setErrors([friendlyPortalError(e)]);
@@ -213,57 +192,29 @@ export function BusinessInfoForm({
       <fieldset disabled={busy || disabled} className="space-y-6">
         <Card title="المعلومات الأساسية">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="اسم العمل (English) *">
+            <Field label="اسم العمل *">
               <input
                 required
-                dir="ltr"
                 maxLength={200}
                 value={f.name}
                 onChange={(e) => set("name", e.target.value)}
                 className={inputClass}
               />
             </Field>
-            <Field label="اسم العمل بالعربية">
-              <input
-                maxLength={200}
-                value={f.name_ar}
-                onChange={(e) => set("name_ar", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="الوصف (English)">
+            <Field label="الوصف">
               <textarea
                 rows={4}
                 maxLength={5000}
-                dir="ltr"
                 value={f.description}
                 onChange={(e) => set("description", e.target.value)}
                 className={inputClass}
               />
             </Field>
-            <Field label="الوصف بالعربية">
-              <textarea
-                rows={4}
-                maxLength={5000}
-                value={f.description_ar}
-                onChange={(e) => set("description_ar", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="ما تقدمه (نص حر، English)" hint="مثال: خبز، كيك، معجنات">
+            <Field label="ما تقدمه (نص حر)" hint="مثال: خبز، كيك، معجنات">
               <input
                 maxLength={2000}
-                dir="ltr"
                 value={f.products}
                 onChange={(e) => set("products", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="ما تقدمه بالعربية">
-              <input
-                maxLength={2000}
-                value={f.products_ar}
-                onChange={(e) => set("products_ar", e.target.value)}
                 className={inputClass}
               />
             </Field>
@@ -293,16 +244,7 @@ export function BusinessInfoForm({
             <button
               type="button"
               aria-pressed={f.shared_kitchen}
-              onClick={() => {
-                setMessage("");
-                setF((prev) => ({
-                  ...prev,
-                  shared_kitchen: !prev.shared_kitchen,
-                  precautions_note: prev.precautions_note.trim()
-                    ? prev.precautions_note
-                    : DEFAULT_SHARED_NOTE,
-                }));
-              }}
+              onClick={() => set("shared_kitchen", !f.shared_kitchen)}
               className={`flex items-start gap-2 rounded-xl border p-3 text-start text-sm ${f.shared_kitchen ? "border-safety-shared bg-safety-shared/10" : "border-border"}`}
             >
               <span className="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-safety-shared" />
@@ -321,71 +263,9 @@ export function BusinessInfoForm({
               "لا تظهر أي نقطة على صفحتك.",
             )}
           </div>
-          {f.shared_kitchen && (
-            <Field label="نص المطبخ المشترك (يظهر للزائر)">
-              <textarea
-                rows={2}
-                maxLength={500}
-                value={f.precautions_note}
-                onChange={(e) => set("precautions_note", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          )}
           <p className="text-xs text-muted-foreground">
             هذه المعلومة مقدَّمة من المنشأة ولا تتحقق منها Pure Table. تأكد من دقتها.
           </p>
-        </Card>
-
-        <Card title="التواصل">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="الهاتف">
-              <input
-                dir="ltr"
-                inputMode="tel"
-                maxLength={40}
-                value={f.phone}
-                onChange={(e) => set("phone", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="واتساب (رقم أو رابط)">
-              <input
-                dir="ltr"
-                maxLength={300}
-                value={f.whatsapp}
-                onChange={(e) => set("whatsapp", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="إنستغرام (اسم الحساب بدون @)">
-              <input
-                dir="ltr"
-                maxLength={300}
-                value={f.instagram}
-                onChange={(e) => set("instagram", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="الموقع الإلكتروني">
-              <input
-                dir="ltr"
-                maxLength={2000}
-                placeholder="https://"
-                value={f.website}
-                onChange={(e) => set("website", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="كود الخصم النشط (اختياري)" hint="كود واحد فقط. اتركه فارغاً لإيقافه.">
-              <input
-                maxLength={80}
-                value={f.discount_code}
-                onChange={(e) => set("discount_code", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </div>
         </Card>
 
         <Card title="الموقع">
@@ -403,79 +283,10 @@ export function BusinessInfoForm({
               </span>
             </span>
           </label>
-          {!f.no_location && (
-            <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="المدينة (English) *">
-                  <input
-                    required
-                    dir="ltr"
-                    maxLength={100}
-                    value={f.city}
-                    onChange={(e) => set("city", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="المدينة بالعربية">
-                  <input
-                    maxLength={100}
-                    value={f.city_ar}
-                    onChange={(e) => set("city_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="الحي (English)">
-                  <input
-                    dir="ltr"
-                    maxLength={100}
-                    value={f.district}
-                    onChange={(e) => set("district", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="الحي بالعربية">
-                  <input
-                    maxLength={100}
-                    value={f.district_ar}
-                    onChange={(e) => set("district_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="العنوان (English)">
-                  <input
-                    dir="ltr"
-                    maxLength={300}
-                    value={f.address}
-                    onChange={(e) => set("address", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="العنوان بالعربية">
-                  <input
-                    maxLength={300}
-                    value={f.address_ar}
-                    onChange={(e) => set("address_ar", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-                <Field label="رابط الاتجاهات (من خرائط قوقل)">
-                  <input
-                    dir="ltr"
-                    maxLength={2000}
-                    placeholder="https://"
-                    value={f.maps_url}
-                    onChange={(e) => set("maps_url", e.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-              </div>
-              <LocationPicker
-                lat={f.lat}
-                lng={f.lng}
-                onPick={(lat, lng) => setF((prev) => ({ ...prev, lat, lng }))}
-              />
-            </>
-          )}
+          <p className="text-xs text-muted-foreground">
+            موقع كل فرع (المدينة، الحي، العنوان، الموقع على الخريطة) يُدار من تبويب «الفروع» الآن —
+            لكل فرع موقعه الخاص.
+          </p>
         </Card>
 
         {!f.no_location && (

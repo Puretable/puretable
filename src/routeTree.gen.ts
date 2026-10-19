@@ -39,6 +39,7 @@ import { Route as SupermarketsRouteImport } from './routes/supermarkets'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WaitlistRouteImport } from './routes/waitlist'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AgreementTextVersionRouteImport } from './routes/agreement-text.$version'
 import { Route as BusinessIdRouteImport } from './routes/business.$id'
 import { Route as CSlugRouteImport } from './routes/c.$slug'
 import { Route as SServiceRouteImport } from './routes/s.$service'
@@ -214,6 +215,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AgreementTextVersionRoute = AgreementTextVersionRouteImport.update({
+  id: '/agreement-text/$version',
+  path: '/agreement-text/$version',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BusinessIdRoute = BusinessIdRouteImport.update({
   id: '/business/$id',
   path: '/business/$id',
@@ -383,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/agreement-text/$version': typeof AgreementTextVersionRoute
   '/business/$id': typeof BusinessIdRoute
   '/c/$slug': typeof CSlugRoute
   '/s/$service': typeof SServiceRoute
@@ -438,6 +445,7 @@ export interface FileRoutesByTo {
   '/supermarkets': typeof SupermarketsRoute
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
+  '/agreement-text/$version': typeof AgreementTextVersionRoute
   '/business/$id': typeof BusinessIdRoute
   '/c/$slug': typeof CSlugRoute
   '/s/$service': typeof SServiceRoute
@@ -496,6 +504,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/waitlist': typeof WaitlistRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/agreement-text/$version': typeof AgreementTextVersionRoute
   '/business/$id': typeof BusinessIdRoute
   '/c/$slug': typeof CSlugRoute
   '/s/$service': typeof SServiceRoute
@@ -554,6 +563,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/waitlist'
     | '/admin'
+    | '/agreement-text/$version'
     | '/business/$id'
     | '/c/$slug'
     | '/s/$service'
@@ -609,6 +619,7 @@ export interface FileRouteTypes {
     | '/supermarkets'
     | '/terms'
     | '/waitlist'
+    | '/agreement-text/$version'
     | '/business/$id'
     | '/c/$slug'
     | '/s/$service'
@@ -666,6 +677,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/waitlist'
     | '/_authenticated/admin'
+    | '/agreement-text/$version'
     | '/business/$id'
     | '/c/$slug'
     | '/s/$service'
@@ -723,6 +735,7 @@ export interface RootRouteChildren {
   SupermarketsRoute: typeof SupermarketsRoute
   TermsRoute: typeof TermsRoute
   WaitlistRoute: typeof WaitlistRoute
+  AgreementTextVersionRoute: typeof AgreementTextVersionRoute
   BusinessIdRoute: typeof BusinessIdRoute
   CSlugRoute: typeof CSlugRoute
   SServiceRoute: typeof SServiceRoute
@@ -944,6 +957,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/agreement-text/$version': {
+      id: '/agreement-text/$version'
+      path: '/agreement-text/$version'
+      fullPath: '/agreement-text/$version'
+      preLoaderRoute: typeof AgreementTextVersionRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/business/$id': {
       id: '/business/$id'
@@ -1219,6 +1239,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupermarketsRoute: SupermarketsRoute,
   TermsRoute: TermsRoute,
   WaitlistRoute: WaitlistRoute,
+  AgreementTextVersionRoute: AgreementTextVersionRoute,
   BusinessIdRoute: BusinessIdRoute,
   CSlugRoute: CSlugRoute,
   SServiceRoute: SServiceRoute,

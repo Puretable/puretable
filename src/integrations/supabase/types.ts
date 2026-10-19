@@ -163,6 +163,8 @@ export type Database = {
           city: string | null;
           city_ar: string | null;
           created_at: string;
+          delivery_enabled: boolean;
+          delivery_url: string | null;
           district: string | null;
           district_ar: string | null;
           hours: Json;
@@ -173,6 +175,7 @@ export type Database = {
           name: string;
           name_ar: string | null;
           permanently_closed: boolean;
+          pickup_enabled: boolean;
           plan_limited: boolean;
           phone: string | null;
           place_id: string | null;
@@ -181,6 +184,7 @@ export type Database = {
           sort_order: number;
           updated_at: string;
           whatsapp: string | null;
+          whatsapp_orders_enabled: boolean;
         };
         Insert: {
           address?: string | null;
@@ -189,6 +193,8 @@ export type Database = {
           city?: string | null;
           city_ar?: string | null;
           created_at?: string;
+          delivery_enabled?: boolean;
+          delivery_url?: string | null;
           district?: string | null;
           district_ar?: string | null;
           hours?: Json;
@@ -199,6 +205,7 @@ export type Database = {
           name: string;
           name_ar?: string | null;
           permanently_closed?: boolean;
+          pickup_enabled?: boolean;
           plan_limited?: boolean;
           phone?: string | null;
           place_id?: string | null;
@@ -207,6 +214,7 @@ export type Database = {
           sort_order?: number;
           updated_at?: string;
           whatsapp?: string | null;
+          whatsapp_orders_enabled?: boolean;
         };
         Update: {
           address?: string | null;
@@ -215,6 +223,8 @@ export type Database = {
           city?: string | null;
           city_ar?: string | null;
           created_at?: string;
+          delivery_enabled?: boolean;
+          delivery_url?: string | null;
           district?: string | null;
           district_ar?: string | null;
           hours?: Json;
@@ -225,6 +235,7 @@ export type Database = {
           name?: string;
           name_ar?: string | null;
           permanently_closed?: boolean;
+          pickup_enabled?: boolean;
           plan_limited?: boolean;
           phone?: string | null;
           place_id?: string | null;
@@ -233,6 +244,7 @@ export type Database = {
           sort_order?: number;
           updated_at?: string;
           whatsapp?: string | null;
+          whatsapp_orders_enabled?: boolean;
         };
         Relationships: [
           {
@@ -525,6 +537,62 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      agreement_versions: {
+        Row: {
+          terms_version: string;
+          full_text: string;
+          text_sha256: string;
+          created_at: string;
+        };
+        Insert: {
+          terms_version: string;
+          full_text: string;
+          text_sha256: string;
+          created_at?: string;
+        };
+        Update: {
+          terms_version?: string;
+          full_text?: string;
+          text_sha256?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      agreement_acceptances: {
+        Row: {
+          id: string;
+          business_id: string;
+          terms_version: string;
+          text_sha256: string | null;
+          accepted_at: string;
+          accepted_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          business_id: string;
+          terms_version: string;
+          text_sha256?: string | null;
+          accepted_at?: string;
+          accepted_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          business_id?: string;
+          terms_version?: string;
+          text_sha256?: string | null;
+          accepted_at?: string;
+          accepted_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agreement_acceptances_business_id_fkey";
+            columns: ["business_id"];
+            isOneToOne: false;
+            referencedRelation: "businesses";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       complaints: {
         Row: {
@@ -955,6 +1023,14 @@ export type Database = {
       admin_delete_business: {
         Args: { _business_id: string };
         Returns: undefined;
+      };
+      get_agreement_version_text: {
+        Args: { _terms_version: string };
+        Returns: string;
+      };
+      owner_sync_pickup_delivery_tags: {
+        Args: { _business_id: string };
+        Returns: string[];
       };
       save_business_billing_fields: {
         Args: {

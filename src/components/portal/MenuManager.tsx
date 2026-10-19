@@ -12,6 +12,7 @@ import {
 } from "@/lib/owner-manage.schemas";
 import { friendlyPortalError } from "@/lib/owner-portal";
 import { validateImageFile } from "@/lib/image-upload";
+import { pickBilingual } from "@/lib/bilingual";
 
 export type MenuManagerProps = {
   businessId: string;
@@ -27,9 +28,7 @@ export type MenuManagerProps = {
 type Draft = {
   id?: string;
   name: string;
-  name_ar: string;
   description: string;
-  description_ar: string;
   price: string;
   photo_url: string | null;
   safety: MenuSafety;
@@ -37,13 +36,12 @@ type Draft = {
 
 const EMPTY: Draft = {
   name: "",
-  name_ar: "",
   description: "",
-  description_ar: "",
   price: "",
   photo_url: null,
   safety: "red",
 };
+
 
 /**
  * Gluten-free menu editor. Same component for owners (portal) and admins (business page): the caller
@@ -71,10 +69,8 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
       item
         ? {
             id: item.id,
-            name: item.name,
-            name_ar: item.name_ar ?? "",
-            description: item.description ?? "",
-            description_ar: item.description_ar ?? "",
+            name: pickBilingual(item.name_ar, item.name),
+            description: pickBilingual(item.description_ar, item.description),
             price: item.price === null ? "" : String(item.price),
             photo_url: item.photo_url,
             safety: item.safety,
@@ -115,9 +111,9 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
       id: draft.id,
       business_id: businessId,
       name: draft.name,
-      name_ar: draft.name_ar,
+      name_ar: draft.name,
       description: draft.description,
-      description_ar: draft.description_ar,
+      description_ar: draft.description,
       price,
       photo_url: draft.photo_url,
       safety: draft.safety,
@@ -207,43 +203,22 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
           </div>
           <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              اسم الصنف (English) *
+              اسم الصنف *
               <input
                 required
                 maxLength={120}
-                dir="ltr"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 className="mt-2 w-full rounded-xl border bg-background p-3"
               />
             </label>
             <label className="block text-sm">
-              اسم الصنف بالعربية
-              <input
-                maxLength={120}
-                value={draft.name_ar}
-                onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })}
-                className="mt-2 w-full rounded-xl border bg-background p-3"
-              />
-            </label>
-            <label className="block text-sm">
-              وصف الصنف (English)
+              وصف الصنف
               <textarea
                 maxLength={500}
                 rows={3}
-                dir="ltr"
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                className="mt-2 w-full rounded-xl border bg-background p-3"
-              />
-            </label>
-            <label className="block text-sm">
-              وصف الصنف بالعربية
-              <textarea
-                maxLength={500}
-                rows={3}
-                value={draft.description_ar}
-                onChange={(e) => setDraft({ ...draft, description_ar: e.target.value })}
                 className="mt-2 w-full rounded-xl border bg-background p-3"
               />
             </label>
@@ -417,5 +392,83 @@ export function MenuManager({ businessId, items, save, remove, sign, disabled }:
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The single discount code — moved out of "بيانات العمل" (see BusinessInfoForm.tsx). Rendered on
+ * the menu tab, below the menu items, regardless of whether the items themselves are shown (the
+ * discount code is never plan-gated, unlike the menu).
+ */
+export function DiscountCodeEditor({
+  discountCode,
+  save,
+  disabled,
+}: {
+  discountCode: string | null;
+  save: (code: string | null) => Promise<unknown>;
+  disabled?: boolean;
+}) {
+  const [draft, setDraft] = useState(discountCode ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy || disabled) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await save(draft.trim() || null);
+      setMessage("تم حفظ كود الخصم.");
+    } catch (e) {
+      setError(friendlyPortalError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-2xl border border-border p-4 sm:p-5">
+      <h3 className="text-sm font-semibold">أكواد الخصم</h3>
+      <label className="block text-sm">
+        كود الخصم النشط (اختياري)
+        <input
+          maxLength={80}
+          disabled={busy || disabled}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setMessage("");
+          }}
+          className="mt-2 w-full rounded-xl border bg-background p-3"
+        />
+        <span className="mt-1 block text-xs text-muted-foreground">
+          كود واحد فقط. اتركه فارغاً لإيقافه.
+        </span>
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p role="status" className="text-sm text-primary">
+          {message}
+        </p>
+      )}
+      {!disabled && (
+        <button
+          type="submit"
+          disabled={busy}
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm text-primary-foreground disabled:opacity-60"
+        >
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          حفظ كود الخصم
+        </button>
+      )}
+    </form>
   );
 }

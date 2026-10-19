@@ -97,6 +97,14 @@ export type Branch = {
   sort_order?: number;
   /** Booking / delivery links attached to this branch only. */
   links?: BusinessLink[];
+  /** Display-only "pickup available" badge — no link. */
+  pickupEnabled?: boolean;
+  /** Shows "delivery available" plus deliveryUrl's button, if set. */
+  deliveryEnabled?: boolean;
+  /** This branch's own delivery/ordering page — never a third-party platform. */
+  deliveryUrl?: string | null;
+  /** When true, WhatsApp is this branch's large order button instead of a plain contact icon. */
+  whatsappOrdersEnabled?: boolean;
 };
 
 /** Manual subscription tier — set by an admin only, no online payments. */
@@ -140,12 +148,17 @@ export type Business = {
   whatsapp?: string | null;
   instagram?: string;
   website?: string;
+  /** Business-level contact fields, shared by every branch (see business_links, branch_id null). */
+  tiktok?: string | null;
+  email?: string | null;
   mapsUrl?: string;
   hours: OpeningHours;
   verified?: boolean;
   dedicatedGf?: boolean;
   noLocation?: boolean;
   offersBooking?: boolean;
+  /** Admin-only mark (success_partners, kind='business', active=true). See isFeatured() in services.ts. */
+  isLaunchPartner?: boolean;
   discountCode?: string | null;
   createdAt?: string;
   links: BusinessLink[];
@@ -397,7 +410,12 @@ export function mapDbBusiness(
     phone: row.phone ?? "",
     whatsapp: row.whatsapp ?? null,
     instagram: row.instagram ?? undefined,
-    website: row.website ?? undefined,
+    // Falls back to a legacy business-level business_links("website") row if the column itself is
+    // empty — some businesses still only have the old link row (never deleted or rewritten).
+    website:
+      row.website ?? links.find((l) => l.platform === "website" && !l.branch_id)?.url ?? undefined,
+    tiktok: links.find((l) => l.platform === "tiktok" && !l.branch_id)?.url ?? null,
+    email: links.find((l) => l.platform === "email" && !l.branch_id)?.url ?? null,
     mapsUrl: row.maps_url ?? undefined,
     hours,
     verified: row.verified,

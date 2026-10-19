@@ -41,66 +41,6 @@ export function toHttpUrl(value: string): string | null {
   }
 }
 
-const httpUrl = (max = 2000) =>
-  z.preprocess(
-    emptyToNull,
-    z
-      .string()
-      .trim()
-      .max(max)
-      .transform((v, ctx) => {
-        const url = toHttpUrl(v);
-        if (!url) {
-          ctx.addIssue({
-            code: "custom",
-            message: "الرابط غير صالح — الصق رابطاً يبدأ بـ https://",
-          });
-          return z.NEVER;
-        }
-        return url;
-      })
-      .nullable()
-      .optional(),
-  );
-
-const phone = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .regex(/^[+0-9 ()\-./]{5,40}$/, "رقم الهاتف غير صالح")
-    .nullable()
-    .optional(),
-);
-/** A WhatsApp number, or a link. */
-const whatsapp = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .max(300)
-    .refine(
-      (v) => /^[+0-9 ()-]{8,30}$/.test(v) || toHttpUrl(v) !== null,
-      "رقم واتساب أو رابط غير صالح",
-    )
-    .nullable()
-    .optional(),
-);
-/** An Instagram handle (with or without @) or a link. */
-const instagram = z.preprocess(
-  emptyToNull,
-  z
-    .string()
-    .trim()
-    .max(300)
-    .refine(
-      (v) => /^@?[A-Za-z0-9._]{1,30}$/.test(v) || toHttpUrl(v) !== null,
-      "حساب إنستغرام غير صالح",
-    )
-    .nullable()
-    .optional(),
-);
-
 const hours = z
   .record(z.string(), z.string().trim().max(60).regex(PLAIN))
   .refine(
@@ -148,11 +88,9 @@ export const OwnerBusinessInput = z.object({
   address_ar: opt(300),
   lat: z.number().min(-90).max(90).nullable().optional(),
   lng: z.number().min(-180).max(180).nullable().optional(),
-  phone,
-  whatsapp,
-  instagram,
-  website: httpUrl(),
-  maps_url: httpUrl(),
+  // phone/whatsapp/maps_url are branch-level now (see OwnerBranchInput); website/instagram/tiktok/
+  // email are the shared business-level contact fields (see BusinessContactInput) — all live in the
+  // portal's "التواصل والطلب" tab now, not here, so there is exactly one place to edit each.
   hours,
   // `offers_booking` is deliberately absent: it is tied to admin-managed categories.
   discount_code: opt(80),
@@ -184,9 +122,8 @@ export const OwnerBranchInput = BranchInput.omit({ plan_limited: true }).extend(
   district: opt(100),
   district_ar: opt(100),
   region: opt(100),
-  phone,
-  whatsapp,
-  maps_url: httpUrl(),
+  // phone/whatsapp/maps_url inherit BranchInput's normalizing validators (phoneField/httpsUrlField)
+  // — deliberately not overridden here.
   hours: hours.default({}),
   sort_order: z.number().int().min(0).max(10000).default(0),
 });
@@ -205,6 +142,12 @@ export type OwnerLinkInput = z.infer<typeof OwnerLinkInput>;
  *  - BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative. Gates
  *    selecting a paid package (and, while packages are platform-disabled, the dashboard too).
  */
+// Stays "v1" for the upcoming production release on purpose: the v2 re-confirmation bump (same
+// text, forces every partner to re-accept — see supabase/test-sync/20261020_agreement_v2.sql) is a
+// deliberate separate, later step, run only once the agreement_acceptances evidence trail
+// (20261019_agreement_evidence.sql) has been live in production for a while. Was briefly "v2" on
+// this branch during its own TEST-only verification; reverted before the production release so
+// deploying this branch's code can never silently re-trigger the gate for real partners.
 export const AGREEMENT_TERMS_VERSION = "v1";
 // Only trade name + CR number are hard-required for now (packages/full invoicing details are
 // platform-disabled — see the `packages_enabled` toggle); the rest stay optional here to match the
@@ -238,6 +181,13 @@ export const AcceptAgreementInput = z.object({
   agree: z.literal(true, { message: "يجب الموافقة على الاتفاقية للمتابعة." }),
 });
 export type AcceptAgreementInput = z.infer<typeof AcceptAgreementInput>;
+
+/** Lives in the menu tab now (see MenuManager.tsx) — shared by the owner portal and admin page. */
+export const DiscountCodeInput = z.object({
+  business_id: z.string().uuid(),
+  discount_code: opt(80),
+});
+export type DiscountCodeInput = z.infer<typeof DiscountCodeInput>;
 
 export const MenuItemInput = z.object({
   id: z.string().uuid().optional(),
@@ -305,7 +255,20 @@ export type OwnerLinkRow = {
   sort_order: number;
 };
 
-export type OwnerBranchRow = z.input<typeof BranchInput> & { id: string };
+// maps_url/phone/whatsapp/delivery_url use a z.preprocess-based validator (so free-form input can
+// be normalized), which makes z.input<> infer "unknown" for them — fine for parsing, but it breaks
+// this type's only real job here: describing the GET response shape for serialization checks. Those
+// 4 fields are overridden with their actual stored (output) shape instead.
+export type OwnerBranchRow = Omit<
+  z.input<typeof BranchInput>,
+  "maps_url" | "phone" | "whatsapp" | "delivery_url"
+> & {
+  id: string;
+  maps_url: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  delivery_url: string | null;
+};
 
 /** Everything the portal loads for one business (the caller's own; RLS enforces that). */
 export type OwnerBusinessDetail = {
@@ -333,6 +296,9 @@ export type OwnerBusinessDetail = {
   whatsapp: string | null;
   instagram: string | null;
   website: string | null;
+  /** Business-level, derived from a business_links row with branch_id null (see saveBusinessContact). */
+  tiktok: string | null;
+  email: string | null;
   maps_url: string | null;
   hours: Record<string, string>;
   discount_code: string | null;

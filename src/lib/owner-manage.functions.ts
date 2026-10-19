@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { allow } from "./rate-limit.server";
 import { AUTHENTICATED_BUSINESS_COLUMNS } from "./businesses.server";
+import { BusinessContactInput } from "./businesses.schemas";
 import {
   acceptPartnershipAgreement,
   deleteMenuItem,
@@ -11,8 +12,10 @@ import {
   deleteOwnerLink,
   getFirstLoginAgreement,
   saveBusinessBillingFields,
+  saveDiscountCode,
   saveMenuItem,
   saveOwnerBranch,
+  saveOwnerBusinessContact,
   saveOwnerLink,
   signOwnerUpload,
   updateOwnerBusiness,
@@ -22,6 +25,7 @@ import {
 import {
   AcceptAgreementInput,
   BillingFieldsInput,
+  DiscountCodeInput,
   MenuItemInput,
   OwnerBranchInput,
   OwnerBusinessInput,
@@ -62,7 +66,16 @@ export const getOwnerBusiness = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) throw new Error("Forbidden");
-    return row as unknown as OwnerBusinessDetail;
+    const links = (
+      row as unknown as {
+        business_links: { platform: string; branch_id: string | null; url: string }[];
+      }
+    ).business_links;
+    return {
+      ...row,
+      tiktok: links.find((l) => l.platform === "tiktok" && !l.branch_id)?.url ?? null,
+      email: links.find((l) => l.platform === "email" && !l.branch_id)?.url ?? null,
+    } as unknown as OwnerBusinessDetail;
   });
 
 export const saveOwnerBusiness = createServerFn({ method: "POST" })
@@ -96,7 +109,9 @@ export const acceptPartnershipAgreementFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => AcceptAgreementInput.parse(input))
   .handler(async ({ data, context }) => {
     const { business_id, ...rest } = data;
-    return acceptPartnershipAgreement(await actorFor(context), business_id, rest);
+    const claims = (context as { claims?: { email?: unknown } }).claims;
+    const email = typeof claims?.email === "string" ? claims.email : null;
+    return acceptPartnershipAgreement(await actorFor(context), business_id, rest, email);
   });
 
 export const saveOwnerPhotosFn = createServerFn({ method: "POST" })
@@ -120,6 +135,11 @@ export const deleteOwnerBranchFn = createServerFn({ method: "POST" })
     deleteOwnerBranch(await actorFor(context), data.businessId, data.id),
   );
 
+export const saveOwnerBusinessContactFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => BusinessContactInput.parse(input))
+  .handler(async ({ data, context }) => saveOwnerBusinessContact(await actorFor(context), data));
+
 export const saveOwnerLinkFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => OwnerLinkInput.parse(input))
@@ -131,6 +151,12 @@ export const deleteOwnerLinkFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     deleteOwnerLink(await actorFor(context), data.businessId, data.id),
   );
+
+/** Shared by the owner portal and the admin business page (admins are always allowed). */
+export const saveDiscountCodeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => DiscountCodeInput.parse(input))
+  .handler(async ({ data, context }) => saveDiscountCode(await actorFor(context), data));
 
 /** Shared by the owner portal and the admin business page (admins are always allowed). */
 export const saveMenuItemFn = createServerFn({ method: "POST" })

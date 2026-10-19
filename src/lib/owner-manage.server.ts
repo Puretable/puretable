@@ -7,6 +7,7 @@ import {
   AGREEMENT_TERMS_VERSION,
   type AcceptAgreementInput,
   type BillingFieldsInput,
+  type DiscountCodeInput,
   type MenuItemInput,
   type OwnerBranchInput,
   type OwnerBusinessInput,
@@ -16,6 +17,8 @@ import {
 import { fillAgreementTemplate } from "./agreement/fill-template";
 import { canUseMenu } from "./plans";
 import { isPackagesEnabled } from "./packages-enabled.server";
+import { saveBusinessContact } from "./business-contact.server";
+import type { BusinessContactInput } from "./businesses.schemas";
 
 /**
  * Owner self-service operations.
@@ -98,7 +101,7 @@ export async function updateOwnerBusiness(
   await requireOwnerAccess(actor, businessId);
   const { data: current, error: readError } = await actor.adminClient
     .from("businesses")
-    .select("id, safety, shared_kitchen, dedicated_gf, verified")
+    .select("id, safety, shared_kitchen, dedicated_gf, precautions_note, verified")
     .eq("id", businessId)
     .single();
   if (readError || !current) throw new Error("Forbidden");
@@ -106,6 +109,11 @@ export async function updateOwnerBusiness(
   const payload: Record<string, unknown> = {
     ...input,
     discount_code: input.discount_code?.trim() || null,
+    // The shared-kitchen note is admin-only: set only from the admin pages. The portal form no
+    // longer submits it as editable, but this pins it to the business's current stored value
+    // regardless of what the request body contains, so a crafted call to this server function
+    // can't change it either. Safety level and shared-kitchen status remain owner-editable.
+    precautions_note: current.precautions_note,
   };
   // Safety wording is the owner's responsibility, but an admin's "verified" badge vouches for the
   // information as it was reviewed, so it is withdrawn whenever that information changes.
@@ -214,13 +222,56 @@ export async function acceptPartnershipAgreement(
   actor: Actor,
   businessId: string,
   _input: Omit<AcceptAgreementInput, "business_id">,
+  email: string | null,
 ) {
   const { error } = await actor.userClient.rpc("accept_partnership_agreement", {
     _business_id: businessId,
     _terms_version: AGREEMENT_TERMS_VERSION,
   });
   if (error) throw agreementError("accept", error.message);
+
+  // Best-effort confirmation email: the acceptance above has already succeeded in the database, so
+  // a failed or slow email must never undo it or surface as an error to the owner.
+  if (email) {
+    void (async () => {
+      try {
+        const { data: business } = await actor.adminClient
+          .from("businesses")
+          .select("name")
+          .eq("id", businessId)
+          .single();
+        if (!business) return;
+        const { notifyAgreementAccepted } = await import("./email.server");
+        await notifyAgreementAccepted({
+          businessId,
+          businessName: business.name,
+          ownerEmail: email,
+          termsVersion: AGREEMENT_TERMS_VERSION,
+          acceptedAt: new Date(),
+        });
+      } catch (e) {
+        console.error(
+          `[agreement:email] confirmation email failed for business ${businessId}`,
+          e instanceof Error ? e.message : e,
+        );
+      }
+    })();
+  }
   return { ok: true as const };
+}
+
+/**
+ * Recomputes ONLY the svc_pickup/svc_delivery tags in businesses.categories from this business's
+ * branches (tag present if any branch has the matching toggle on) via the narrow, owner-callable
+ * owner_sync_pickup_delivery_tags RPC — the sole path by which an owner can ever influence
+ * categories. Called through the owner's OWN session (not the service-role client) so the RPC's own
+ * ownership check is genuinely exercised, not just trusted internal plumbing.
+ */
+async function syncPickupDeliveryTags(actor: Actor, businessId: string) {
+  const { error } = await actor.userClient.rpc("owner_sync_pickup_delivery_tags", {
+    _business_id: businessId,
+  });
+  if (error) throw new Error(friendlyDbError(error.message));
 }
 
 export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
@@ -242,6 +293,7 @@ export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
       .select()
       .single();
     if (error) throw new Error(friendlyDbError(error.message));
+    await syncPickupDeliveryTags(actor, business_id);
     return data;
   }
   const { data, error } = await actor.adminClient
@@ -250,6 +302,7 @@ export async function saveOwnerBranch(actor: Actor, input: OwnerBranchInput) {
     .select()
     .single();
   if (error) throw new Error(friendlyDbError(error.message));
+  await syncPickupDeliveryTags(actor, business_id);
   return data;
 }
 
@@ -261,7 +314,19 @@ export async function deleteOwnerBranch(actor: Actor, businessId: string, id: st
     .eq("id", id)
     .eq("business_id", businessId);
   if (error) throw new Error(error.message);
+  await syncPickupDeliveryTags(actor, businessId);
   return { ok: true as const };
+}
+
+/**
+ * The 4 business-level contact fields (website, instagram, tiktok, email) — shared by every
+ * branch. website/instagram write to the plain `businesses` columns; tiktok/email upsert a
+ * business-level (branch_id null) business_links row, enforced one-per-platform by
+ * business_links_business_level_unique.
+ */
+export async function saveOwnerBusinessContact(actor: Actor, input: BusinessContactInput) {
+  await requireOwnerAccess(actor, input.business_id);
+  return saveBusinessContact(actor.adminClient, input);
 }
 
 async function assertBranchBelongs(actor: Actor, businessId: string, branchId: string) {
@@ -338,6 +403,19 @@ async function assertMenuAllowed(actor: Actor, businessId: string, access: Acces
     .eq("id", businessId)
     .single();
   if (error || !data) throw new Error("Forbidden");
+}
+
+/** The single discount code, now edited from the menu tab (shared by owner portal and admin). */
+export async function saveDiscountCode(actor: Actor, input: DiscountCodeInput) {
+  await requireOwnerOrAdmin(actor, input.business_id);
+  const { data, error } = await actor.adminClient
+    .from("businesses")
+    .update({ discount_code: input.discount_code?.trim() || null })
+    .eq("id", input.business_id)
+    .select("discount_code")
+    .single();
+  if (error) throw new Error(friendlyDbError(error.message));
+  return data;
 }
 
 export async function saveMenuItem(actor: Actor, input: MenuItemInput) {

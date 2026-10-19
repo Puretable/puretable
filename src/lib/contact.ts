@@ -96,3 +96,30 @@ export function emailHref(value: string | null | undefined): string | null {
   if (!raw || !raw.includes("@")) return null;
   return `mailto:${raw}`;
 }
+
+/**
+ * The WhatsApp order message for a branch's pickup or delivery button (OrderContactBox): the
+ * standard greeting, which method was chosen, and any selected menu items — in that order. Labels
+ * are passed in already resolved (by the caller's i18n) so this stays a plain, testable function.
+ */
+export function composeOrderMessage(params: {
+  orderMethodLabel: string;
+  methodLabel: string;
+  itemsLabel: string;
+  items: string[];
+}): string {
+  const lines = [WHATSAPP_INQUIRY_MESSAGE, `${params.orderMethodLabel}: ${params.methodLabel}`];
+  if (params.items.length) {
+    lines.push(`${params.itemsLabel}:`);
+    lines.push(...params.items);
+  }
+  return lines.join("\n");
+}
+
+/** A pickup/delivery button only ever appears once there is a WhatsApp number to open it with. */
+export function shouldShowOrderButton(
+  enabled: boolean,
+  whatsappNumber: string | null | undefined,
+): boolean {
+  return enabled && !!whatsappNumber?.trim();
+}
