@@ -677,10 +677,7 @@ function BusinessDetail() {
 
       {showLocation && mapPoints.length > 0 ? (
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <h2 className="font-display text-xl font-semibold">
-            {t("business.location")}
-            {mapPoints.length > 1 ? ` (${mapPoints.length})` : ""}
-          </h2>
+          <h2 className="font-display text-xl font-semibold">{t("business.location")}</h2>
           <div className="mt-4">
             {mapPoints.length > 1 && (
               <div
