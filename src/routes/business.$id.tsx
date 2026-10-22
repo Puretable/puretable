@@ -357,6 +357,10 @@ function BusinessDetail() {
         <div className="relative h-64 w-full overflow-hidden sm:h-80 lg:h-96">
           <CoverImage src={b.cover} alt={name} category={b.category} imgClassName="p-2" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+          <FavoriteButton
+            b={b}
+            className="absolute top-3 end-3 z-10 h-11 w-11 border-none bg-white text-foreground shadow-lg hover:bg-white"
+          />
         </div>
         <div className="mx-auto -mt-24 max-w-7xl px-4 sm:px-6 lg:px-8">
           <Link
@@ -366,27 +370,67 @@ function BusinessDetail() {
             <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" /> {t("common.back")}
           </Link>
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-elevated)] sm:p-10">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-              <div className="min-w-0">
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
-                    {categoryLabel}
-                  </span>
-                  {hasCategory(b, "home") && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                      <Building2 className="h-3 w-3" /> {t("filters.home_badge")}
-                    </span>
-                  )}
+            <div className="min-w-0">
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-3 py-1 text-xs font-medium text-primary">
+                  {categoryLabel}
                 </span>
-                <h1 className="mt-3 font-display text-3xl font-semibold leading-tight sm:text-4xl">
-                  {name}
-                </h1>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4" /> {city}
-                </p>
-              </div>
-              <FavoriteButton b={b} className="h-11 w-11" />
+                {hasCategory(b, "home") && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+                    <Building2 className="h-3 w-3" /> {t("filters.home_badge")}
+                  </span>
+                )}
+              </span>
+              <h1 className="mt-3 font-display text-3xl font-semibold leading-tight sm:text-4xl">
+                {name}
+              </h1>
+              <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4" /> {city}
+              </p>
             </div>
+
+            {(products || description || serviceTags.length > 0) && (
+              <div className="mt-5 max-w-3xl space-y-3">
+                {products && (
+                  <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
+                    <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {products
+                        .split("-")
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                        .map((part, i) => (
+                          <span
+                            key={`${part}-${i}`}
+                            className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-foreground"
+                          >
+                            {part}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {description && (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {visibleDescription(b, description)}
+                  </p>
+                )}
+
+                {serviceTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {serviceTags.map((sv) => (
+                      <span
+                        key={sv.value}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary"
+                      >
+                        <sv.icon className="h-3.5 w-3.5" /> {sv[lang]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-6 max-w-3xl">
               <SafetyNote
@@ -472,32 +516,6 @@ function BusinessDetail() {
                 />
               )}
 
-              {products && (
-                <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-secondary/40 p-4">
-                  <Utensils className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <div className="flex flex-wrap gap-1.5">
-                    {products
-                      .split("-")
-                      .map((part) => part.trim())
-                      .filter(Boolean)
-                      .map((part, i) => (
-                        <span
-                          key={`${part}-${i}`}
-                          className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-foreground"
-                        >
-                          {part}
-                        </span>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {description && (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {visibleDescription(b, description)}
-                </p>
-              )}
-
               {gallery.length > 0 && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {gallery.map((src) => (
@@ -512,19 +530,6 @@ function BusinessDetail() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {serviceTags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {serviceTags.map((sv) => (
-                    <span
-                      key={sv.value}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary"
-                    >
-                      <sv.icon className="h-3.5 w-3.5" /> {sv[lang]}
-                    </span>
                   ))}
                 </div>
               )}

@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Instagram, Mail, Phone, UserRound, Music2, MessageCircle, Heart } from "lucide-react";
+import { Instagram, Mail, Phone, UserRound, Music2, MessageCircle, Heart, Store } from "lucide-react";
 import { instagramHref, tiktokHref, whatsappHref } from "@/lib/contact";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -36,7 +36,7 @@ export function SiteHeader() {
   const signedIn = useSession();
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex min-h-20 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-20 max-w-7xl flex-nowrap items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex shrink-0 items-center gap-1">
           <LogoMark className="h-11 shrink-0 sm:h-12" />
           <span className="flex min-w-0 flex-col leading-tight">
@@ -51,7 +51,50 @@ export function SiteHeader() {
         </Link>
         <div className="hidden lg:block" />
 
-        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
+        {/* Phone widths (360–430px): compact icon-only controls, same row as the logo, never wrapping. */}
+        <div className="flex shrink-0 items-center gap-1 sm:hidden">
+          {shows("header_language") && <LanguageSwitcher iconOnly />}
+          <Link
+            to="/favorites"
+            aria-label={t("nav.favorites")}
+            title={t("nav.favorites")}
+            className="grid h-11 w-11 place-items-center rounded-full border border-border text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+          >
+            <Heart className="h-5 w-5" />
+          </Link>
+          {signedIn ? (
+            <Link
+              to="/profile"
+              aria-label="حسابي"
+              title="حسابي"
+              className="grid h-11 w-11 place-items-center rounded-full border border-primary/30 bg-primary-soft text-primary"
+            >
+              <UserRound className="h-5 w-5" />
+            </Link>
+          ) : (
+            <Link
+              to="/auth"
+              aria-label={t("nav.sign_in")}
+              title={t("nav.sign_in")}
+              className="grid h-11 w-11 place-items-center rounded-full border border-border text-muted-foreground hover:text-foreground"
+            >
+              <UserRound className="h-5 w-5" />
+            </Link>
+          )}
+          {shows("header_cta") && (
+            <Link
+              to="/portal"
+              aria-label={t("nav.owner_portal")}
+              title={t("nav.owner_portal")}
+              className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] transition hover:opacity-90"
+            >
+              <Store className="h-5 w-5" />
+            </Link>
+          )}
+        </div>
+
+        {/* Tablet and up: unchanged full-size controls. */}
+        <div className="hidden max-w-full shrink-0 flex-wrap items-center gap-2 sm:flex">
           {shows("header_language") && <LanguageSwitcher />}
           <Link
             to="/favorites"
