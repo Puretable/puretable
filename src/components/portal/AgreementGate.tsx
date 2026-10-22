@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { FileText } from "lucide-react";
+import { FileText, Info } from "lucide-react";
 import {
   acceptPartnershipAgreementFn,
   getFirstLoginAgreementFn,
 } from "@/lib/owner-manage.functions";
+import { AGREEMENT_TERMS_VERSION } from "@/lib/owner-manage.schemas";
+import { isV1ToV2Reacceptance } from "@/lib/agreement-reacceptance";
 import { friendlyPortalError, type OwnerBusiness } from "@/lib/owner-portal";
 
 /**
@@ -60,6 +62,16 @@ export function AgreementGate({
           </p>
         </div>
       </div>
+      {isV1ToV2Reacceptance(business.terms_version, AGREEMENT_TERMS_VERSION) && (
+        <div className="flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary-soft p-4 text-sm leading-relaxed text-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <p>
+            نحدّث في بيور تيبل طريقة توثيق موافقتك على اتفاقية الشراكة. نص الاتفاقية والشروط والرسوم
+            ما تغيّر نهائياً، والهدف فقط تسجيل موافقتك بشكل رسمي، وبعدها يصلك إيميل تأكيد. صفحة
+            منشأتك للزوار ما تتأثر.
+          </p>
+        </div>
+      )}
       {/* Safe here: `agreementHtml` is our own static legal-text template (never user input) with
           only the business's field values spliced in, and the server already HTML-escapes every one
           of those values before returning this string (see fill-template.ts). */}

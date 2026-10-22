@@ -142,13 +142,11 @@ export type OwnerLinkInput = z.infer<typeof OwnerLinkInput>;
  *  - BillingFieldsInput — trade name, CR/tax numbers, address, email, phone, representative. Gates
  *    selecting a paid package (and, while packages are platform-disabled, the dashboard too).
  */
-// Stays "v1" for the upcoming production release on purpose: the v2 re-confirmation bump (same
-// text, forces every partner to re-accept — see supabase/test-sync/20261020_agreement_v2.sql) is a
-// deliberate separate, later step, run only once the agreement_acceptances evidence trail
-// (20261019_agreement_evidence.sql) has been live in production for a while. Was briefly "v2" on
-// this branch during its own TEST-only verification; reverted before the production release so
-// deploying this branch's code can never silently re-trigger the gate for real partners.
-export const AGREEMENT_TERMS_VERSION = "v1";
+// Bumped to "v2": a re-confirmation only, same text as v1 (see
+// supabase/production-release/07_agreement_v2_insert.sql, already live in production — it copies
+// v1's full_text/text_sha256 byte-for-byte into the v2 row). Every current partner is re-prompted
+// once, with AgreementGate's isV1ToV2Reacceptance() notice explaining nothing in the terms changed.
+export const AGREEMENT_TERMS_VERSION = "v2";
 // Only trade name + CR number are hard-required for now (packages/full invoicing details are
 // platform-disabled — see the `packages_enabled` toggle); the rest stay optional here to match the
 // relaxed `save_business_billing_fields` database function, so the full form works unchanged the
