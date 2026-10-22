@@ -44,7 +44,8 @@ export function publicClient() {
 // terms_accepted_at/terms_version are deliberately NOT here either: they're the owner's private
 // agreement record, mapDbBusiness() never reads them for a public response, and the MCP
 // get_gluten_free_place tool spreads this exact select() straight into its public JSON — see
-// supabase/test-sync/<agreement-column-privacy>.sql for the matching anon column-grant revoke.
+// supabase/test-sync/20261022_agreement_columns_anon_privacy.sql for the matching anon column-grant
+// revoke.
 export const PUBLIC_BUSINESS_COLUMNS =
   "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,business_info_completed";
 
