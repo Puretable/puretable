@@ -1,10 +1,32 @@
 import { Languages } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
-export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
+export function LanguageSwitcher({
+  compact = false,
+  iconOnly = false,
+}: {
+  compact?: boolean;
+  iconOnly?: boolean;
+}) {
   const { lang, setLang } = useLanguage();
   const next = lang === "en" ? "ar" : "en";
   const label = lang === "en" ? "العربية" : "English";
+  const shortLabel = lang === "en" ? "ع" : "EN";
+
+  if (iconOnly) {
+    return (
+      <button
+        type="button"
+        onClick={() => setLang(next)}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border text-sm font-semibold text-foreground transition hover:bg-accent"
+        aria-label="Toggle language"
+        title={label}
+      >
+        {shortLabel}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

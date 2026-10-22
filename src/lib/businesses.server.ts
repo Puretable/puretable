@@ -41,16 +41,22 @@ export function publicClient() {
 // supabase/test-sync/20261021_branch_location_privacy_and_sync.sql) — they're fetched separately
 // via public_business_coordinates()/public_branch_coordinates(), which null them out for
 // home-category businesses. This is the actual privacy boundary, not just a UI choice.
+// terms_accepted_at/terms_version are deliberately NOT here either: they're the owner's private
+// agreement record, mapDbBusiness() never reads them for a public response, and the MCP
+// get_gluten_free_place tool spreads this exact select() straight into its public JSON — see
+// supabase/test-sync/20261022_agreement_columns_anon_privacy.sql for the matching anon column-grant
+// revoke.
 export const PUBLIC_BUSINESS_COLUMNS =
-  "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,terms_accepted_at,terms_version,business_info_completed";
+  "id,slug,name,name_ar,category,categories,safety,region,city,cities,city_ar,district,district_ar,address,address_ar,phone,whatsapp,instagram,website,maps_url,cover_url,photos,description,description_ar,products,products_ar,hours,plan,offers_booking,discount_code,verified,dedicated_gf,shared_kitchen,precautions_note,no_location,published,created_at,updated_at,business_info_completed";
 
-// Same as PUBLIC_BUSINESS_COLUMNS, plus lat/lng (authenticated keeps full column access — only anon
-// was narrowed) and the two internal moderation fields that only the `authenticated` role (owners,
-// admins — anyone logged in) is granted, never anon. Any authenticated-context query against
-// `businesses` (admin CRUD, owner self-service saves) must use this instead of select("*")/bare
-// select() — those now fail outright for any role without a blanket table-level grant, which no
-// longer exists on this table after the billing-column fix.
-export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},lat,lng,needs_review,review_notes`;
+// Same as PUBLIC_BUSINESS_COLUMNS, plus lat/lng, terms_accepted_at/terms_version (the owner's own
+// agreement status — needed by the owner portal's agreement gate and by admin), and the two internal
+// moderation fields that only the `authenticated` role (owners, admins — anyone logged in) is
+// granted, never anon. Any authenticated-context query against `businesses` (admin CRUD, owner
+// self-service saves) must use this instead of select("*")/bare select() — those now fail outright
+// for any role without a blanket table-level grant, which no longer exists on this table after the
+// billing-column fix.
+export const AUTHENTICATED_BUSINESS_COLUMNS = `${PUBLIC_BUSINESS_COLUMNS},lat,lng,needs_review,review_notes,terms_accepted_at,terms_version`;
 
 // Explicit allowlist for public (anon) reads of `business_branches` — lat/lng excluded for the same
 // reason as above; fetched separately and redacted for home businesses.
